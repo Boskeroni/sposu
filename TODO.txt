@@ -1,0 +1,13 @@
+[X] list out the available maps with song name and artist
+[X] have the user search which song to select
+[X] have user index through the songs
+[X] show the current playlist of songs to play
+[X] play the first song in the list and then remove it
+[X] display information about the currently selected song
+[X] reformated the ui function
+[X] serialize the songs to make things easier to load 
+[X] remove duplicate files in the songs
+[X] allow pause play and stopping of songs
+[X] allow changing of the volume
+[X] make input look different when not in input mode
+[] allow the creation of playlists
