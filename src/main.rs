@@ -65,6 +65,9 @@ fn main_loop<B: Backend>(
                             _ => app.normal_mode_handler(key)
                         }
                     }
+                    InputMode::NewPlaylist => {
+                        app.new_playlist_handler(key);
+                    }
                 }
                 
             }

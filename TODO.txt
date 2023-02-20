@@ -10,4 +10,7 @@
 [X] allow pause play and stopping of songs
 [X] allow changing of the volume
 [X] make input look different when not in input mode
-[] allow the creation of playlists
+[X] allow the creation of playlists
+[X] show currently selected playlist
+[X] allow songs to be added to playlists
+[] allow playing the playlist 
