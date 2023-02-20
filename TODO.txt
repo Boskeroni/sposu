@@ -13,4 +13,5 @@
 [X] allow the creation of playlists
 [X] show currently selected playlist
 [X] allow songs to be added to playlists
-[] allow playing the playlist 
+[X] allow playing the playlist
+[X] make the current input mode stack based

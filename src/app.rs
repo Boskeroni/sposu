@@ -7,7 +7,8 @@ use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::Song;
 
-pub enum InputMode {
+#[derive(Copy, Clone)]
+pub enum UIMode {
     Input,
     Normal,
     NewPlaylist,
@@ -19,6 +20,7 @@ pub struct Playlist {
     pub songs: Vec<Song>,
     pub index: usize,
 }
+
 impl Playlist {
     fn new(name: String) -> Self {
         Self {
@@ -37,7 +39,7 @@ pub struct AppData {
 }
 
 pub struct App {
-    pub input_mode: InputMode,
+    pub current_mode: UIMode,
     pub sink: Sink,
     pub search: String,
     pub shown_songs: Vec<Song>,
@@ -47,12 +49,13 @@ pub struct App {
     pub index: usize,
     pub new_playlist_name: String,
     pub shown_playlist: Option<Playlist>,
+    pub adding_playlist: bool,
+    pub input_mode_stack: Vec<UIMode>,
     all_songs: Vec<Song>,
     stream_handle: OutputStreamHandle,
     _stream: OutputStream,
     is_playing: bool,
     volume: f32,
-    
 }
 
 impl App {
@@ -69,15 +72,57 @@ impl App {
             listening_songs: VecDeque::new(),
             index: 0,
             is_playing: false,
-            input_mode: InputMode::Normal,
+            current_mode: UIMode::Normal,
             volume: 1.0,
             playlists: Vec::new(),
             playlist_index: 0,
             new_playlist_name: String::new(),
             shown_playlist: None,
+            adding_playlist: false,
+            input_mode_stack: vec![UIMode::Normal],
         }
     }
     
+    pub fn global_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
+        match key.code {
+            KeyCode::Tab => {
+                self.input_mode_stack.pop();
+                match self.current_mode {
+                    UIMode::Input => self.current_mode = UIMode::NewPlaylist,
+                    UIMode::NewPlaylist => self.current_mode = UIMode::Normal,
+                    UIMode::Normal => self.current_mode = UIMode::Input,
+                }
+                self.input_mode_stack.push(self.current_mode);
+            }
+            KeyCode::Esc => {
+                let popped_mode = self.input_mode_stack.pop().unwrap();
+                match popped_mode {
+                    UIMode::Normal => return Err(1),
+                    _ => self.current_mode = *self.input_mode_stack.last().clone().unwrap()
+                }
+            }
+            _ => {}
+        }
+        return Ok(())
+    }
+
+    pub fn specific_handler(&mut self, key: &KeyEvent) {
+        match self.current_mode {
+            UIMode::Input => {
+                self.input_handler(key);
+            }
+            UIMode::Normal => {
+                match key.code {
+                    KeyCode::Esc => {},
+                    _ => self.normal_handler(key)
+                }
+            }
+            UIMode::NewPlaylist => {
+                self.playlist_handler(key);
+            }
+        }
+    }
+
     pub fn get_matching_songs(&mut self) {
         self.shown_songs = vec![];
         for song in self.all_songs.clone() {
@@ -101,10 +146,10 @@ impl App {
         self.is_playing = true;
     }
 
-    pub fn input_mode_handler(&mut self, key: KeyEvent) {
+    pub fn input_handler(&mut self, key: &KeyEvent) {
         match key.code {
             // adds new song to the playlist
-            KeyCode::Left => {
+            KeyCode::Right => {
                 if self.playlists.len() == 0 {
                     return;
                 }
@@ -117,7 +162,7 @@ impl App {
                     self.shown_playlist = Some(self.playlists[self.playlist_index].clone());
                 }
             }
-            KeyCode::Right => {
+            KeyCode::Left => {
                 if self.playlists.len() == 0 {
                     return;
                 }
@@ -134,9 +179,6 @@ impl App {
                 }
                 let new_song = self.shown_songs[self.index].clone();
                 self.listening_songs.push_back(new_song);
-            }
-            KeyCode::Esc => {
-                self.input_mode = InputMode::Normal
             }
             KeyCode::Char(e) => {
                 self.search.push(e);
@@ -161,7 +203,7 @@ impl App {
         }
     }
 
-    pub fn normal_mode_handler(&mut self, key: KeyEvent) {
+    pub fn normal_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Left => {
                 if self.playlists.len() == 0 {
@@ -172,9 +214,6 @@ impl App {
                     self.listening_songs.push_back(song);
                 }
             }
-
-            KeyCode::Char('i') => self.input_mode = InputMode::Input,
-            KeyCode::Char('o') => self.input_mode = InputMode::NewPlaylist,
             KeyCode::Char(' ') => {
                 if self.sink.is_paused() {
                     self.sink.play();
@@ -203,25 +242,31 @@ impl App {
         }
     }
 
-    pub fn new_playlist_handler(&mut self, key: KeyEvent) {
+    pub fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
-            KeyCode::Esc => {
-                self.input_mode = InputMode::Normal;
-            }
             KeyCode::Backspace => {
                 self.new_playlist_name.pop();
             }
             KeyCode::Char(c) => {
-                self.new_playlist_name.push(c);
+                if self.adding_playlist {
+                    self.new_playlist_name.push(c);
+                    return;
+                }
+                if c == 'n' {
+                    self.adding_playlist = true;
+                }
             }
             KeyCode::Enter => {
+                if !self.adding_playlist && self.playlists.len() != 0{
+                    self.shown_playlist = Some(self.playlists[self.playlist_index].clone())
+                }
                 if self.new_playlist_name.len() == 0 {
                     return;
                 }
                 let new_playlist = Playlist::new(self.new_playlist_name.clone());
                 self.playlists.push(new_playlist);
                 self.new_playlist_name = String::new();
-                self.input_mode = InputMode::Normal
+                self.adding_playlist = false;
             }
             KeyCode::Up => {
                 if self.playlist_index == 0 {

@@ -9,13 +9,13 @@ INPUT_MODE =>
     UP        => goes up the list
 
 NORMAL_MODE =>
-    'i'  => sets mode to input mode
-    'o'  => sets mode to new playlist mode
-    ' '  => pauses / starts the current song
-    DEL  => quits the current song
-    DOWN => lowers the volume
-    UP   => raises the volume
-    ESC  => quits app
+    'i'       => sets mode to input mode
+    'o'       => sets mode to new playlist mode
+    ' '       => pauses / starts the current song
+    DEL       => quits the current song
+    DOWN      => lowers the volume
+    UP        => raises the volume
+    ESC       => quits app
 
 NEW_PLAYLIST_MODE =>
     ESC       => quits new playlist mode

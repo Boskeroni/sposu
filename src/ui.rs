@@ -6,7 +6,7 @@ use tui::style::{Style, Color, Modifier};
 use tui::text::{Span, Text, Spans};
 use unicode_width::UnicodeWidthStr;
 
-use crate::{App, InputMode};
+use crate::{App, UIMode};
 
 pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
     let all_chunks = Layout::default()
@@ -34,11 +34,6 @@ pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
             Constraint::Percentage(70),
         ]).split(all_chunks[1]);
 
-    match app.input_mode {
-        InputMode::NewPlaylist => new_playlist_ui(app, f, right_chunks[2]),
-        _ => basic_playlist(app, f, right_chunks[2])
-    }
-
     // renders the input block
     song_input(app, f, left_chunks[0]);
 
@@ -51,13 +46,22 @@ pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
     // renders the information for the songs
     song_info(app, f, right_chunks[1]);
 
+    // renders the playlist block including new bar if needed
+    if app.adding_playlist {
+        new_playlist_ui(app, f, right_chunks[2]);
+    } else {
+        basic_playlist(app, f, right_chunks[2]);
+    }
+
     // sets the cursor to the input field
     f.set_cursor(left_chunks[1].x + app.search.width() as u16 + 1, left_chunks[0].y + 1);
 }
 
+
+/// RENDERS THE SEARCH BAR FOR THE SONGS
 fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
-    let paragraph_style = match app.input_mode {
-        InputMode::Input => Style::default().fg(Color::Yellow),
+    let paragraph_style = match app.current_mode {
+        UIMode::Input => Style::default().fg(Color::Yellow),
         _ => Style::default()
     };
 
@@ -67,6 +71,7 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     f.render_widget(input_block, area);
 }
 
+/// RENDERS THE RESULTS FROM THE SEARCH BAR
 fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let list_items: Vec<ListItem> = app.shown_songs.iter().enumerate().map(|(i, song)| {
         let chosen_symbol = if i == app.index {
@@ -84,13 +89,18 @@ fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
         ListItem::new(Text::from(Spans::from(line_content)))
     }).collect();
 
+    let style = match app.current_mode {
+        UIMode::Input => Style::default().add_modifier(Modifier::ITALIC).fg(Color::Yellow),
+        _ => Style::default().add_modifier(Modifier::ITALIC)
+    };
+
     let shown_songs_block = List::new(list_items)
-        .block(Block::default().title("songs").borders(Borders::ALL).border_type(BorderType::Rounded))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+        .block(Block::default().style(style).title("songs").borders(Borders::ALL).border_type(BorderType::Rounded))
         .highlight_symbol(">>");
     f.render_widget(shown_songs_block, area);
 }
 
+/// RENDERS THE CURRENTLY LISTENING TO BIT
 fn listening_to<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let playlist_items: Vec<ListItem> = app.listening_songs.iter().enumerate().map(|(i, s)| {
         let style = if i == 0 {
@@ -109,6 +119,7 @@ fn listening_to<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     f.render_widget(playlist_block, area);
 }
 
+/// RENDERS THE SONG INFORMATION
 fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let to_raw_listitem = |i| {ListItem::new(Text::from(Spans::from(Span::raw(i))))};
     
@@ -139,13 +150,14 @@ fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     f.render_widget(info_block, area);
 }
 
+/// RENDERS THE PLAYLIST WHEN NEW INPUT IS ADDED
 fn new_playlist_ui<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let playlist_chunk = Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
         .constraints([
             Constraint::Length(3),
-            Constraint::Min(1),
+            Constraint::Percentage(70),
         ]).split(area);
     
     let input_block = Paragraph::new(app.new_playlist_name.clone())
@@ -155,30 +167,51 @@ fn new_playlist_ui<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     basic_playlist(app, f, playlist_chunk[1]);
 }
 
+/// RENDERS THE PLAYLIST OTHERWISE, SOMETIMES DOES SONGS INSIDE PLAYLIST
 fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
-    if let Some(playlist) = &app.shown_playlist {
-        let playlist_items: Vec<ListItem> = playlist.songs.iter().map(|s| {
-            let content = Span::styled(&s.song_name, Style::default().fg(Color::Cyan));
-            ListItem::new(Text::from(Spans::from(content)))
-        }).collect();
-        let playlist_block = List::new(playlist_items)
-        .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).title("playlists"));
+    let style = match app.current_mode {
+        UIMode::NewPlaylist => Style::default().fg(Color::Yellow),
+        _ => Style::default(),
+    };
 
-        f.render_widget(playlist_block, area);
-        return
-    }
-    let playlist_items: Vec<ListItem> = app.playlists.iter().enumerate().map(|(i, s)| {
-        let content = if i == app.playlist_index {
-            Span::styled(&s.name, Style::default().fg(Color::Red))
+    let title = if app.shown_playlist.is_some() {
+        app.shown_playlist.clone().unwrap().name
+    } else {
+        "playlists".to_string()
+    };
+
+    // renders when shown the playlist's songs
+    let content: Vec<String> = if app.shown_playlist.is_some() {
+        let mut names = Vec::new();
+        for song in app.shown_playlist.clone().unwrap().songs {
+            names.push(song.song_name.clone());
+        }
+        names
+    } else {
+        let mut names = Vec::new();
+        for playlist in app.playlists.clone() {
+            names.push(playlist.name.clone())
+        }
+        names
+    };
+
+    let list_items: Vec<ListItem> = content.iter().enumerate().map(|(i, s)| {
+        let content = if i == app.playlist_index && app.shown_playlist.is_none() {
+            Span::styled(s, Style::default().fg(Color::Red))
         } else {
-            Span::raw(&s.name)
+            Span::raw(s)
         };
 
         ListItem::new(Text::from(Spans::from(content)))
     }).collect();
 
-    let playlist_block = List::new(playlist_items)
-        .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).title("playlists"));
+    let playlist_block = List::new(list_items)
+        .block(Block::default()
+            .style(style)
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(title)
+        );
 
     f.render_widget(playlist_block, area)
 }

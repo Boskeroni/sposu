@@ -9,6 +9,7 @@ pub struct Song {
     pub song_name: String,
     pub artist: String,
 }
+
 impl Song {
     fn new(beatmap: Beatmap, song_path: PathBuf) -> Self {
         let mut audio_path = song_path.to_string_lossy().to_string();

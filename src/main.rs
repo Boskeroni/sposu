@@ -1,15 +1,12 @@
 use std::{thread, fs};
 use std::time::Duration;
-use crossterm::{
-    terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen}, 
-    event::{EnableMouseCapture, Event, self, KeyCode, DisableMouseCapture},
-    execute
-};
+use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::event::{EnableMouseCapture, Event, self, KeyCode, DisableMouseCapture};
+use crossterm::execute;
+use tui::backend::{Backend, CrosstermBackend};
+use tui::Terminal;
 use std::io;
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal
-};
 
 mod osu;
 mod ui;
@@ -55,21 +52,31 @@ fn main_loop<B: Backend>(
         }
         if crossterm::event::poll(Duration::from_millis(20))? {
             if let Event::Key(key) = event::read()? {
-                match app.input_mode {
-                    InputMode::Input => {
-                        app.input_mode_handler(key);
+                if let Err(_) = app.global_handler(&key) {
+                    return Ok(())
+                };
+                app.specific_handler(&key);
+                match key.code {
+                    KeyCode::Tab => {
+                        app.input_mode_stack.pop();
+                        match app.current_mode {
+                            UIMode::Input => app.current_mode = UIMode::NewPlaylist,
+                            UIMode::NewPlaylist => app.current_mode = UIMode::Normal,
+                            UIMode::Normal => app.current_mode = UIMode::Input,
+                        }
+                        app.input_mode_stack.push(app.current_mode);
                     }
-                    InputMode::Normal => {
-                        match key.code {
-                            KeyCode::Esc => return Ok(()),
-                            _ => app.normal_mode_handler(key)
+                    KeyCode::Esc => {
+                        let popped_mode = app.input_mode_stack.pop().unwrap();
+                        match popped_mode {
+                            UIMode::Normal => return Ok(()),
+                            _ => app.current_mode = popped_mode
                         }
                     }
-                    InputMode::NewPlaylist => {
-                        app.new_playlist_handler(key);
+                    _ => {
+
                     }
                 }
-                
             }
         }
         terminal.draw(|f| ui::render(f, &app))?;
