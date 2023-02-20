@@ -1,0 +1,26 @@
+INPUT_MODE =>
+    LEFT      => adds new song to playlist
+    RIGHT     => shows the contents of playlist
+    ENTER     => adds song to the queue 
+    ESC       => quits input mode
+    CHAR      => adds car to search bar 
+    BACKSPACE => backspaces the search
+    DOWN      => goes down the list
+    UP        => goes up the list
+
+NORMAL_MODE =>
+    'i'  => sets mode to input mode
+    'o'  => sets mode to new playlist mode
+    ' '  => pauses / starts the current song
+    DEL  => quits the current song
+    DOWN => lowers the volume
+    UP   => raises the volume
+    ESC  => quits app
+
+NEW_PLAYLIST_MODE =>
+    ESC       => quits new playlist mode
+    BACKSPACE => backspaces new name
+    CHAR      => adds char to new name
+    ENTER     => adds new playlist with name
+    UP        => goes up the playlist list
+    DOWN      => goes down the playlist list
