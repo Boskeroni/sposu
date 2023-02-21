@@ -6,6 +6,7 @@ use std::fs::File;
 use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::Song;
+use crate::serialize;
 
 #[derive(Copy, Clone, Debug)]
 pub enum UIMode {
@@ -14,11 +15,10 @@ pub enum UIMode {
     Playlist,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
     pub name: String,
     pub songs: Vec<Song>,
-    pub index: usize,
 }
 
 impl Playlist {
@@ -26,16 +26,15 @@ impl Playlist {
         Self {
             name,
             songs: Vec::new(),
-            index: 0,
         }
     }
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppData {
     pub song_path: String,
-    pub is_serialized: bool,
+    pub serialized_songs: bool,
     pub serialize_path: String,
-    pub playlist_path: String
+    pub playlist_path: String,
 }
 
 pub struct App {
@@ -59,7 +58,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(songs: Vec<Song>, glob_data: AppData) -> Self {
+    pub fn new(songs: Vec<Song>, glob_data: AppData, playlists: Vec<Playlist>) -> Self {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::new_idle().0;
         Self {
@@ -74,7 +73,7 @@ impl App {
             is_playing: false,
             current_mode: UIMode::Normal,
             volume: 1.0,
-            playlists: Vec::new(),
+            playlists,
             playlist_index: 0,
             new_playlist_name: String::new(),
             shown_playlist: None,
@@ -246,6 +245,9 @@ impl App {
 
     fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
+            KeyCode::Left => {
+                self.shown_playlist = None;
+            }
             KeyCode::Backspace => {
                 self.new_playlist_name.pop();
             }
@@ -254,8 +256,10 @@ impl App {
                     self.new_playlist_name.push(c);
                     return;
                 }
-                if c == 'n' {
-                    self.adding_playlist = true;
+                match c {
+                    'n' => self.adding_playlist = true,
+                    's' => serialize::serialize(&self.playlists, &self.glob_data.playlist_path),
+                    _ => {}
                 }
             }
             KeyCode::Enter => {

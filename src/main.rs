@@ -24,7 +24,7 @@ fn main() -> Result<(), io::Error>{
 
     let global_data: AppData = serialize::deserialize::<AppData>("assets/data.json");
 
-    let songs = match global_data.is_serialized {
+    let songs = match global_data.serialized_songs {
         true => serialize::deserialize(&global_data.serialize_path),
         false => {
             let songs = osu::load_songs(&global_data.song_path);
@@ -33,7 +33,9 @@ fn main() -> Result<(), io::Error>{
         }
     };
 
-    let app = App::new(songs, global_data);
+    let playlists = serialize::deserialize(&global_data.playlist_path);
+
+    let app = App::new(songs, global_data, playlists);
     let res = main_loop(&mut terminal, app);
     
     disable_raw_mode()?;
