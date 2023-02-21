@@ -2,7 +2,7 @@ use std::thread;
 use std::time::Duration;
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
-use crossterm::event::{EnableMouseCapture, Event, self, KeyCode, DisableMouseCapture};
+use crossterm::event::{EnableMouseCapture, Event, self, DisableMouseCapture};
 use crossterm::execute;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
@@ -46,10 +46,7 @@ fn main() -> Result<(), io::Error>{
     Ok(())
 }
 
-fn main_loop<B: Backend>(
-    terminal: &mut Terminal<B>, 
-    mut app: App,
-) -> io::Result<()> {
+fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
         if app.sink.empty() {
             app.play_next_song()
@@ -60,27 +57,6 @@ fn main_loop<B: Backend>(
                     return Ok(())
                 };
                 app.specific_handler(&key);
-                match key.code {
-                    KeyCode::Tab => {
-                        app.input_mode_stack.pop();
-                        match app.current_mode {
-                            UIMode::Input => app.current_mode = UIMode::NewPlaylist,
-                            UIMode::NewPlaylist => app.current_mode = UIMode::Normal,
-                            UIMode::Normal => app.current_mode = UIMode::Input,
-                        }
-                        app.input_mode_stack.push(app.current_mode);
-                    }
-                    KeyCode::Esc => {
-                        let popped_mode = app.input_mode_stack.pop().unwrap();
-                        match popped_mode {
-                            UIMode::Normal => return Ok(()),
-                            _ => app.current_mode = popped_mode
-                        }
-                    }
-                    _ => {
-
-                    }
-                }
             }
         }
         terminal.draw(|f| renderer::render(f, &app))?;

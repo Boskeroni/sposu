@@ -7,11 +7,11 @@ use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::Song;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum UIMode {
     Input,
     Normal,
-    NewPlaylist,
+    Playlist,
 }
 
 #[derive(Debug, Clone)]
@@ -50,7 +50,6 @@ pub struct App {
     pub new_playlist_name: String,
     pub shown_playlist: Option<Playlist>,
     pub adding_playlist: bool,
-    pub input_mode_stack: Vec<UIMode>,
     all_songs: Vec<Song>,
     stream_handle: OutputStreamHandle,
     _stream: OutputStream,
@@ -80,7 +79,6 @@ impl App {
             new_playlist_name: String::new(),
             shown_playlist: None,
             adding_playlist: false,
-            input_mode_stack: vec![UIMode::Normal],
             glob_data
         }
     }
@@ -92,19 +90,16 @@ impl App {
     pub fn global_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
         match key.code {
             KeyCode::Tab => {
-                self.input_mode_stack.pop();
                 match self.current_mode {
-                    UIMode::Input => self.current_mode = UIMode::NewPlaylist,
-                    UIMode::NewPlaylist => self.current_mode = UIMode::Normal,
+                    UIMode::Input => self.current_mode = UIMode::Playlist,
+                    UIMode::Playlist => self.current_mode = UIMode::Normal,
                     UIMode::Normal => self.current_mode = UIMode::Input,
                 }
-                self.input_mode_stack.push(self.current_mode);
             }
             KeyCode::Esc => {
-                let popped_mode = self.input_mode_stack.pop().unwrap();
-                match popped_mode {
+                match self.current_mode {
                     UIMode::Normal => return Err(1),
-                    _ => self.current_mode = *self.input_mode_stack.last().clone().unwrap()
+                    _ => self.current_mode = UIMode::Normal
                 }
             }
             _ => {}
@@ -123,7 +118,7 @@ impl App {
                     _ => self.normal_handler(key)
                 }
             }
-            UIMode::NewPlaylist => {
+            UIMode::Playlist => {
                 self.playlist_handler(key);
             }
         }

@@ -171,7 +171,7 @@ fn new_playlist_ui<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 /// RENDERS THE PLAYLIST OTHERWISE, SOMETIMES DOES SONGS INSIDE PLAYLIST
 fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let style = match app.current_mode {
-        UIMode::NewPlaylist => Style::default().fg(Color::Yellow),
+        UIMode::Playlist => Style::default().fg(Color::Yellow),
         _ => Style::default(),
     };
 
