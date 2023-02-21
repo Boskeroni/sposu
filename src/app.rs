@@ -56,10 +56,11 @@ pub struct App {
     _stream: OutputStream,
     is_playing: bool,
     volume: f32,
+    glob_data: AppData,
 }
 
 impl App {
-    pub fn new(songs: Vec<Song>) -> Self {
+    pub fn new(songs: Vec<Song>, glob_data: AppData) -> Self {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::new_idle().0;
         Self {
@@ -80,9 +81,14 @@ impl App {
             shown_playlist: None,
             adding_playlist: false,
             input_mode_stack: vec![UIMode::Normal],
+            glob_data
         }
     }
     
+    pub fn to_valid_path(&self, file: &str) -> String {
+        format!("{}/{}", self.glob_data.song_path, file)
+    }
+
     pub fn global_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
         match key.code {
             KeyCode::Tab => {
@@ -140,13 +146,14 @@ impl App {
             self.is_playing = false;
             return;
         }
-        let audio_file = File::open(self.listening_songs[0].audio_path.clone()).unwrap();
+        let path = format!("{}{}", self.glob_data.song_path, self.listening_songs[0].audio_path.clone());
+        let audio_file = File::open(path).unwrap();
         self.sink = self.stream_handle.play_once(audio_file).unwrap();
         self.sink.set_volume(self.volume);
         self.is_playing = true;
     }
 
-    pub fn input_handler(&mut self, key: &KeyEvent) {
+    fn input_handler(&mut self, key: &KeyEvent) {
         match key.code {
             // adds new song to the playlist
             KeyCode::Right => {
@@ -203,7 +210,7 @@ impl App {
         }
     }
 
-    pub fn normal_handler(&mut self, key: &KeyEvent) {
+    fn normal_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Left => {
                 if self.playlists.len() == 0 {
@@ -242,7 +249,7 @@ impl App {
         }
     }
 
-    pub fn playlist_handler(&mut self, key: &KeyEvent) {
+    fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Backspace => {
                 self.new_playlist_name.pop();
@@ -257,6 +264,13 @@ impl App {
                 }
             }
             KeyCode::Enter => {
+                if self.shown_playlist.is_some() {
+                    for song in self.shown_playlist.clone().unwrap().songs {
+                        self.listening_songs.push_back(song);
+                    }
+                    return;
+                }
+
                 if !self.adding_playlist && self.playlists.len() != 0{
                     self.shown_playlist = Some(self.playlists[self.playlist_index].clone())
                 }
