@@ -5,22 +5,21 @@ use serde::{Serialize, Deserialize};
 use std::fs::File;
 use crossterm::event::{KeyEvent, KeyCode};
 
-use crate::osu::Song;
+use crate::osu::{Song, Mod};
 use crate::serialize;
 
 #[derive(Copy, Clone, Debug)]
 pub enum UIMode {
     Input,
-    Normal,
+    SongQueue,
     Playlist,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Playlist {
     pub name: String,
     pub songs: Vec<Song>,
 }
-
 impl Playlist {
     fn new(name: String) -> Self {
         Self {
@@ -29,6 +28,7 @@ impl Playlist {
         }
     }
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppData {
     pub song_path: String,
@@ -71,8 +71,8 @@ impl App {
             listening_songs: VecDeque::new(),
             index: 0,
             is_playing: false,
-            current_mode: UIMode::Normal,
-            volume: 1.0,
+            current_mode: UIMode::SongQueue,
+            volume: 0.5,
             playlists,
             playlist_index: 0,
             new_playlist_name: String::new(),
@@ -91,14 +91,14 @@ impl App {
             KeyCode::Tab => {
                 match self.current_mode {
                     UIMode::Input => self.current_mode = UIMode::Playlist,
-                    UIMode::Playlist => self.current_mode = UIMode::Normal,
-                    UIMode::Normal => self.current_mode = UIMode::Input,
+                    UIMode::Playlist => self.current_mode = UIMode::SongQueue,
+                    UIMode::SongQueue => self.current_mode = UIMode::Input,
                 }
             }
             KeyCode::Esc => {
                 match self.current_mode {
-                    UIMode::Normal => return Err(1),
-                    _ => self.current_mode = UIMode::Normal
+                    UIMode::SongQueue => return Err(1),
+                    _ => self.current_mode = UIMode::SongQueue
                 }
             }
             _ => {}
@@ -111,7 +111,7 @@ impl App {
             UIMode::Input => {
                 self.input_handler(key);
             }
-            UIMode::Normal => {
+            UIMode::SongQueue => {
                 match key.code {
                     KeyCode::Esc => {},
                     _ => self.normal_handler(key)
@@ -140,11 +140,24 @@ impl App {
             self.is_playing = false;
             return;
         }
-        let path = format!("{}{}", self.glob_data.song_path, self.listening_songs[0].audio_path.clone());
+        let next_song = self.listening_songs[0].clone();
+
+        let (speed, amp) = match next_song.modifier {
+            Mod::Nightcore => (1.5, 1.0),
+            Mod::NoMod => (1.0, 1.0),
+            Mod::DoubleTime => (1.5, 0.66),
+        };
+
+        let path = format!("{}{}", &self.glob_data.song_path, &next_song.audio_path);
         let audio_file = File::open(path).unwrap();
+
+        
         self.sink = self.stream_handle.play_once(audio_file).unwrap();
+
         self.sink.set_volume(self.volume);
+        self.sink.set_speed(speed);
         self.is_playing = true;
+
     }
 
     fn input_handler(&mut self, key: &KeyEvent) {
@@ -164,15 +177,15 @@ impl App {
                 }
             }
             KeyCode::Left => {
-                if self.playlists.len() == 0 {
+                if self.shown_songs.len() == 0 {
                     return;
                 }
-                if self.shown_playlist.is_none() {
-                    self.shown_playlist = Some(self.playlists[self.playlist_index].clone());
-                    return;
+                let current_mod = self.shown_songs[self.index].modifier;
+                self.shown_songs[self.index].modifier = match current_mod {
+                    Mod::NoMod => Mod::DoubleTime,
+                    Mod::DoubleTime => Mod::Nightcore,
+                    Mod::Nightcore => Mod::NoMod,
                 }
-                self.shown_playlist = None;
-                
             }
             KeyCode::Enter => {
                 if self.shown_songs.len() == 0 {

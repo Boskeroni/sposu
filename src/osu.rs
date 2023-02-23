@@ -3,11 +3,19 @@ use serde::{Serialize, Deserialize};
 
 use libosu::prelude::Beatmap;
 
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Mod {
+    NoMod,
+    Nightcore,
+    DoubleTime,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Song {
     pub audio_path: String,
     pub song_name: String,
     pub artist: String,
+    pub modifier: Mod,
 }
 
 impl Song {
@@ -17,6 +25,7 @@ impl Song {
             audio_path,
             song_name: beatmap.title,
             artist: beatmap.artist,
+            modifier: Mod::NoMod
         }
     }
 }
@@ -33,30 +42,40 @@ pub fn load_songs(song_path: &str) -> Vec<Song> {
             continue;
         }
         let valid_folder = fs::read_dir(folder.path().as_path()).unwrap();
+        let mp3_folder = fs::read_dir(folder.path().as_path()).unwrap();
+
+        let mut mp3_ratio = 0;
+        for file in mp3_folder {
+            if let Some(e) = file.unwrap().path().extension() {
+                if e == "mp3" {
+                    mp3_ratio += 1;
+                }
+            }
+        }
         
         for file in valid_folder {
-            let file = file.unwrap().path();
-            if file.is_dir() {
+            let file = file.unwrap();
+            if let Some(e) = file.path().extension() {
+                if e.to_string_lossy() != "osu" {
+                    continue;
+                }
+            } else {
                 continue;
-            }
-            if file.extension().unwrap() != "osu" {
-                continue;
-            }
-            
-            let osu_file = File::open(&file).unwrap();
-            let osu_file_reader = BufReader::new(osu_file);
-            let parsed_map = Beatmap::parse(osu_file_reader);
-    
-            // parser sometimes errors, no clue why
-            if let Ok(i) = parsed_map {
+            };
+
+            let osu_file_reader = BufReader::new(File::open(&file.path()).unwrap());    
+            if let Ok(i) = Beatmap::parse(osu_file_reader) {
                 let name_artist = format!("{}-{}", i.title, i.artist);
                 if used_songs.iter().any(|e| e == &name_artist) {
                     continue;
                 }
                 used_songs.push(name_artist);
                 let path = folder.path().to_string_lossy().replace(&song_path, "");
-                let new_song = Song::new(i, path);
-                songs.push(new_song);
+                songs.push(Song::new(i, path));
+                mp3_ratio -= 1;
+                if mp3_ratio == 0 {
+                    break;
+                }
             }
         }
     }

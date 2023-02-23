@@ -6,6 +6,7 @@ use tui::style::{Style, Color, Modifier};
 use tui::text::{Span, Text, Spans};
 use unicode_width::UnicodeWidthStr;
 
+use crate::osu::Mod;
 use crate::{App, UIMode};
 
 pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
@@ -47,11 +48,8 @@ pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
     song_info(app, f, right_chunks[1]);
 
     // renders the playlist block including new bar if needed
-    if app.adding_playlist {
-        new_playlist_ui(app, f, right_chunks[2]);
-    } else {
-        basic_playlist(app, f, right_chunks[2]);
-    }
+    if app.adding_playlist { new_playlist_ui(app, f, right_chunks[2]); } 
+    else { basic_playlist(app, f, right_chunks[2]); }
 
     // sets the cursor to the input field
     f.set_cursor(left_chunks[1].x + app.search.width() as u16 + 1, left_chunks[0].y + 1);
@@ -74,10 +72,20 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 /// RENDERS THE RESULTS FROM THE SEARCH BAR
 fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let list_items: Vec<ListItem> = app.shown_songs.iter().enumerate().map(|(i, song)| {
-        let chosen_symbol = if i == app.index {
-            ">"
+        let (chosen_symbol, mod_text) = if i == app.index {
+            let mod_text = if let UIMode::Input = app.current_mode {
+                match song.modifier {
+                    Mod::NoMod => "<NoMod>",
+                    Mod::DoubleTime => "<DoubleTime>",
+                    Mod::Nightcore => "<Nightcore>",
+                }
+            } else {
+                " "
+            };
+
+            (">", mod_text)
         } else {
-            " "
+            (" ", " ")
         };
         let line_content = vec![
             Span::styled(chosen_symbol, Style::default().fg(Color::Red)),
@@ -85,6 +93,8 @@ fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
             Span::styled(&song.artist, Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(": "),
             Span::styled(&song.song_name, Style::default().fg(Color::Green)),
+            Span::raw(" "),
+            Span::styled(mod_text, Style::default().fg(Color::Cyan))
         ];
         ListItem::new(Text::from(Spans::from(line_content)))
     }).collect();
@@ -126,9 +136,15 @@ fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let content = if app.shown_songs.len() == 0 {
         vec![to_raw_listitem(format!("No song selected"))]
     } else {
+
         let song = app.shown_songs[app.index].clone();
         let path = app.to_valid_path(&song.audio_path);
-        let file_length = mp3_duration::from_path(path).unwrap().as_secs();
+        let length_mult = match song.modifier { 
+            Mod::NoMod => 1.0,
+            _ => 1.5,
+        };
+        
+        let file_length = (mp3_duration::from_path(path).unwrap().as_secs() as f32 / length_mult) as usize;
         let formatted_secs = if file_length%60 < 10 {
             format!("0{}", file_length%60)
         } else {

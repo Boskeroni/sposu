@@ -22,10 +22,10 @@ fn main() -> Result<(), io::Error>{
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let global_data: AppData = serialize::deserialize::<AppData>("assets/data.json");
+    let global_data: AppData = serialize::deserialize::<AppData>("assets/data.json").unwrap();
 
     let songs = match global_data.serialized_songs {
-        true => serialize::deserialize(&global_data.serialize_path),
+        true => serialize::deserialize(&global_data.serialize_path).unwrap(),
         false => {
             let songs = osu::load_songs(&global_data.song_path);
             serialize::serialize(&songs, &global_data.serialize_path);
@@ -33,7 +33,7 @@ fn main() -> Result<(), io::Error>{
         }
     };
 
-    let playlists = serialize::deserialize(&global_data.playlist_path);
+    let playlists = serialize::deserialize(&global_data.playlist_path).unwrap();
 
     let app = App::new(songs, global_data, playlists);
     let res = main_loop(&mut terminal, app);
