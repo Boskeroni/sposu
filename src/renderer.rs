@@ -9,6 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::osu::Mod;
 use crate::{App, UIMode};
 
+/// THE GLOBAL RENDERER THAT CALLS EVERYTHING ELSE
 pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
     let all_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -198,44 +199,46 @@ fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
         _ => Style::default(),
     };
 
-    let title = if app.current_playlist.is_some() {
-        app.current_playlist.clone().unwrap().name
-    } else {
-        "playlists".to_string()
+    let list = match app.current_playlist.is_none() {
+        true => get_outer_playlist(app, style),
+        false => get_inner_playlist(app, style)
     };
+    f.render_widget(list, area)
+}
 
-    // renders when shown the playlist's songs
-    let content: Vec<String> = if app.current_playlist.is_some() {
-        let mut names = Vec::new();
-        for song in app.current_playlist.clone().unwrap().songs {
-            names.push(song.song_name.clone());
-        }
-        names
-    } else {
-        let mut names = Vec::new();
-        for playlist in app.playlists.clone() {
-            names.push(playlist.name.clone())
-        }
-        names
-    };
+/// RETURNS LIST OF SONGS INSIDE PLAYLIST
+fn get_inner_playlist(app: &App, style: Style) -> List {
+    let playlist = app.current_playlist.clone().unwrap();
 
-    let list_items: Vec<ListItem> = content.iter().enumerate().map(|(i, s)| {
-        let content = if i == app.playlist_i && app.current_playlist.is_none() {
-            Span::styled(s, Style::default().fg(Color::Red))
-        } else {
-            Span::raw(s)
-        };
-
-        ListItem::new(Text::from(Spans::from(content)))
+    let title = format!("name: {}|shuffle: {}|repeat: {}|", playlist.name, playlist.shuffle_on, playlist.repeat_on);
+    let list_items: Vec<ListItem> = playlist.songs.iter().map(|s| {
+        ListItem::new(Text::from(Spans::from(Span::raw(s.song_name.clone()))))
     }).collect();
 
     let playlist_block = List::new(list_items)
         .block(Block::default()
-            .style(style)
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .title(title)
-        );
+        .style(style)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(title)
+    );
+    playlist_block
+}
 
-    f.render_widget(playlist_block, area)
+/// RETURNS LIST OF PLAYLIST
+fn get_outer_playlist(app: &App, style: Style) -> List {
+    let title = "playlists";
+
+    let list_items: Vec<ListItem> = app.playlists.iter().map(|p| {
+        ListItem::new(Text::from(Spans::from(Span::raw(p.name.clone()))))
+    }).collect();
+
+    let playlist_block = List::new(list_items)
+        .block(Block::default()
+        .style(style)
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(title)
+    );
+    playlist_block
 }

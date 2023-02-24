@@ -6,6 +6,7 @@ use std::fs::File;
 use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::{Song, Mod};
+use crate::playlists::Playlist;
 use crate::serialize;
 
 #[derive(Copy, Clone, Debug)]
@@ -13,20 +14,6 @@ pub enum UIMode {
     Input,
     SongQueue,
     Playlist,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Playlist {
-    pub name: String,
-    pub songs: Vec<Song>,
-}
-impl Playlist {
-    fn new(name: String) -> Self {
-        Self {
-            name,
-            songs: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -86,10 +73,12 @@ impl App {
         }
     }
     
+    /// CONVERTS THE FILE PATH INTO A VALID SONG PATH
     pub fn to_valid_path(&self, file: &str) -> String {
         format!("{}/{}", self.glob_data.song_path, file)
     }
 
+    /// HANDLES THE EVENTS WHICH MATTER REGARDLESS OF STATE
     pub fn global_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
         match key.code {
             KeyCode::Tab => {
@@ -110,6 +99,7 @@ impl App {
         return Ok(())
     }
 
+    /// RELEGATES THE OTHER EVENTS TO THEIR SPECIFIC STATES
     pub fn specific_handler(&mut self, key: &KeyEvent) {
         match self.current_ui {
             UIMode::Input => {
@@ -127,6 +117,7 @@ impl App {
         }
     }
 
+    /// GETS ALL THE MATCHING SONGS FROM SEARCH QUERY
     pub fn get_matching_songs(&mut self) {
         self.displayed_songs = vec![];
         for song in self.all_songs.clone() {
@@ -136,6 +127,7 @@ impl App {
         }
     }
 
+    /// PLAYS THE CURRENTLY SELECTED SONG
     pub fn play_selected_song(&mut self) {
         if self.is_playing {
             self.now_playing.remove(self.currently_playing_i);
@@ -166,6 +158,7 @@ impl App {
 
     }
 
+    /// HANDLES INPUT FOR SONG QUERY BLOCK
     fn input_handler(&mut self, key: &KeyEvent) {
         match key.code {
             // adds new song to the playlist
@@ -223,6 +216,7 @@ impl App {
         }
     }
 
+    /// HANDLES INPUT FOR NOW PLAYING BLOCK
     fn play_now_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Left => {
@@ -274,6 +268,7 @@ impl App {
         }
     }
 
+    /// HANDLES INPUT FOR PLAYLISTS
     fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Left => {
@@ -293,7 +288,17 @@ impl App {
                 }
                 match c {
                     'n' => self.is_adding_list = true,
-                    's' => serialize::serialize(&self.playlists, &self.glob_data.playlist_path),
+                    'q' => serialize::serialize(&self.playlists, &self.glob_data.playlist_path),
+                    'w' => {
+                        if self.current_playlist.is_some() {
+                            self.playlists[self.playlist_i].repeat_on = !self.playlists[self.playlist_i].repeat_on;
+                        }
+                    }
+                    'e' => {
+                        if self.current_playlist.is_some() {
+                            self.playlists[self.playlist_i].shuffle_on = self.playlists[self.playlist_i].shuffle_on;
+                        }
+                    }
                     _ => {}
                 }
             }

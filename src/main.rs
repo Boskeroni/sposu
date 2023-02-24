@@ -12,13 +12,19 @@ mod osu;
 mod renderer;
 mod app;
 mod serialize;
+mod playlists;
 
 use app::*;
 
+/// INITIALISES APP
 fn main() -> Result<(), io::Error>{
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(
+        stdout, 
+        EnterAlternateScreen, 
+        EnableMouseCapture,
+    )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -48,6 +54,7 @@ fn main() -> Result<(), io::Error>{
     Ok(())
 }
 
+/// RUNS THE APP
 fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
         if app.sink.empty() {

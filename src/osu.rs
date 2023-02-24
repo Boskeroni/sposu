@@ -30,6 +30,8 @@ impl Song {
     }
 }
 
+/// LOADS ALL THE SONGS IN THE SONG FOLDER PROVIDED
+/// IT ERRORS ON SOME OF THE FILES WHICH IS BAD BUT IDK HOW TO FIX IT
 pub fn load_songs(song_path: &str) -> Vec<Song> {
     let mut songs = Vec::new();
     let song_folder = fs::read_dir(song_path).unwrap();
