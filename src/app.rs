@@ -38,20 +38,22 @@ pub struct AppData {
 }
 
 pub struct App {
-    pub current_mode: UIMode,
+    pub current_ui: UIMode,
     pub sink: Sink,
-    pub search: String,
-    pub shown_songs: Vec<Song>,
-    pub listening_songs: VecDeque<Song>,
+    pub query: String,
+    pub displayed_songs: Vec<Song>,
+    pub now_playing: VecDeque<Song>,
     pub playlists: Vec<Playlist>,
-    pub playlist_index: usize,
-    pub index: usize,
+    pub playlist_i: usize,
+    pub query_i: usize,
     pub new_playlist_name: String,
-    pub shown_playlist: Option<Playlist>,
-    pub adding_playlist: bool,
+    pub current_playlist: Option<Playlist>,
+    pub is_adding_list: bool,
+    pub playing_bar_i: usize,
+    pub currently_playing_i: usize,
     all_songs: Vec<Song>,
-    stream_handle: OutputStreamHandle,
     _stream: OutputStream,
+    stream_handle: OutputStreamHandle,
     is_playing: bool,
     volume: f32,
     glob_data: AppData,
@@ -62,23 +64,25 @@ impl App {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::new_idle().0;
         Self {
-            search: String::new(),
+            query: String::new(),
             all_songs: songs.clone(),
             sink,
             stream_handle,
-            _stream,
-            shown_songs: songs,
-            listening_songs: VecDeque::new(),
-            index: 0,
+            displayed_songs: songs,
+            now_playing: VecDeque::new(),
+            query_i: 0,
             is_playing: false,
-            current_mode: UIMode::SongQueue,
+            current_ui: UIMode::SongQueue,
             volume: 0.5,
             playlists,
-            playlist_index: 0,
+            playlist_i: 0,
             new_playlist_name: String::new(),
-            shown_playlist: None,
-            adding_playlist: false,
-            glob_data
+            current_playlist: None,
+            is_adding_list: false,
+            glob_data,
+            playing_bar_i: 0,
+            currently_playing_i: 0,
+            _stream
         }
     }
     
@@ -89,16 +93,16 @@ impl App {
     pub fn global_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
         match key.code {
             KeyCode::Tab => {
-                match self.current_mode {
-                    UIMode::Input => self.current_mode = UIMode::Playlist,
-                    UIMode::Playlist => self.current_mode = UIMode::SongQueue,
-                    UIMode::SongQueue => self.current_mode = UIMode::Input,
+                match self.current_ui {
+                    UIMode::Input => self.current_ui = UIMode::Playlist,
+                    UIMode::Playlist => self.current_ui = UIMode::SongQueue,
+                    UIMode::SongQueue => self.current_ui = UIMode::Input,
                 }
             }
             KeyCode::Esc => {
-                match self.current_mode {
+                match self.current_ui {
                     UIMode::SongQueue => return Err(1),
-                    _ => self.current_mode = UIMode::SongQueue
+                    _ => self.current_ui = UIMode::SongQueue
                 }
             }
             _ => {}
@@ -107,14 +111,14 @@ impl App {
     }
 
     pub fn specific_handler(&mut self, key: &KeyEvent) {
-        match self.current_mode {
+        match self.current_ui {
             UIMode::Input => {
                 self.input_handler(key);
             }
             UIMode::SongQueue => {
                 match key.code {
                     KeyCode::Esc => {},
-                    _ => self.normal_handler(key)
+                    _ => self.play_now_handler(key)
                 }
             }
             UIMode::Playlist => {
@@ -124,25 +128,27 @@ impl App {
     }
 
     pub fn get_matching_songs(&mut self) {
-        self.shown_songs = vec![];
+        self.displayed_songs = vec![];
         for song in self.all_songs.clone() {
-            if song.song_name.to_lowercase().contains(&self.search.to_lowercase()) {
-                self.shown_songs.push(song);
+            if song.song_name.to_lowercase().contains(&self.query.to_lowercase()) {
+                self.displayed_songs.push(song);
             }
         }
     }
 
-    pub fn play_next_song(&mut self) {
+    pub fn play_selected_song(&mut self) {
         if self.is_playing {
-            self.listening_songs.pop_front();
+            self.now_playing.remove(self.currently_playing_i);
+            self.playing_bar_i -= 1;
         }
-        if self.listening_songs.len() == 0 {
+        if self.now_playing.len() == 0 {
             self.is_playing = false;
             return;
         }
-        let next_song = self.listening_songs[0].clone();
+        let next_song = self.now_playing[self.playing_bar_i].clone();
+        self.currently_playing_i = self.playing_bar_i;
 
-        let (speed, amp) = match next_song.modifier {
+        let (speed, _amp) = match next_song.modifier {
             Mod::Nightcore => (1.5, 1.0),
             Mod::NoMod => (1.0, 1.0),
             Mod::DoubleTime => (1.5, 0.66),
@@ -167,90 +173,102 @@ impl App {
                 if self.playlists.len() == 0 {
                     return;
                 }
-                if self.shown_songs.len() == 0 {
+                if self.displayed_songs.len() == 0 {
                     return;
                 }
-                let new_song = self.shown_songs[self.index].clone();
-                self.playlists[self.playlist_index].songs.push(new_song);
-                if self.shown_playlist.is_some() {
-                    self.shown_playlist = Some(self.playlists[self.playlist_index].clone());
+                let new_song = self.displayed_songs[self.query_i].clone();
+                self.playlists[self.playlist_i].songs.push(new_song);
+                if self.current_playlist.is_some() {
+                    self.current_playlist = Some(self.playlists[self.playlist_i].clone());
                 }
             }
             KeyCode::Left => {
-                if self.shown_songs.len() == 0 {
+                if self.displayed_songs.len() == 0 {
                     return;
                 }
-                let current_mod = self.shown_songs[self.index].modifier;
-                self.shown_songs[self.index].modifier = match current_mod {
+                let current_mod = self.displayed_songs[self.query_i].modifier;
+                self.displayed_songs[self.query_i].modifier = match current_mod {
                     Mod::NoMod => Mod::DoubleTime,
                     Mod::DoubleTime => Mod::Nightcore,
                     Mod::Nightcore => Mod::NoMod,
                 }
             }
             KeyCode::Enter => {
-                if self.shown_songs.len() == 0 {
+                if self.displayed_songs.len() == 0 {
                     return;
                 }
-                let new_song = self.shown_songs[self.index].clone();
-                self.listening_songs.push_back(new_song);
+                let new_song = self.displayed_songs[self.query_i].clone();
+                self.now_playing.push_back(new_song);
             }
             KeyCode::Char(e) => {
-                self.search.push(e);
+                self.query.push(e);
                 self.get_matching_songs();
-                self.index = 0;
+                self.query_i = 0;
             }
             KeyCode::Backspace => {
-                self.search.pop();
+                self.query.pop();
                 self.get_matching_songs();
             }
             KeyCode::Down => {
-                if self.index != self.shown_songs.len() - 1{
-                    self.index += 1;
+                if self.query_i != self.displayed_songs.len() - 1{
+                    self.query_i += 1;
                 }
             }
             KeyCode::Up => {
-                if self.index != 0 {
-                    self.index -= 1;
+                if self.query_i != 0 {
+                    self.query_i -= 1;
                 }
             }
             _ => {}
         }
     }
 
-    fn normal_handler(&mut self, key: &KeyEvent) {
+    fn play_now_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Left => {
                 if self.playlists.len() == 0 {
                     return;
                 }
-                let playlist = self.playlists[self.playlist_index].clone();
+                let playlist = self.playlists[self.playlist_i].clone();
                 for song in playlist.songs {
-                    self.listening_songs.push_back(song);
+                    self.now_playing.push_back(song);
                 }
             }
+            KeyCode::Enter => {
+                if self.playing_bar_i == self.currently_playing_i {
+                    return;
+                }
+                self.sink.stop();
+                self.play_selected_song();
+            }
+
             KeyCode::Char(' ') => {
                 if self.sink.is_paused() {
                     self.sink.play();
-                } else {
-                    self.sink.pause();
+                    return;
                 }
+                self.sink.pause();
             }
             KeyCode::Delete => {
-                self.sink.stop();
-            }
-            KeyCode::Down => {
-                if self.volume == 0.0 {
+                if self.playing_bar_i == self.currently_playing_i {
+                    self.sink.stop();
                     return;
                 }
-                self.volume -= 0.1;
-                self.sink.set_volume(self.volume);
+                self.now_playing.remove(self.playing_bar_i);
             }
             KeyCode::Up => {
-                if self.volume > 2.0 {
+                if self.playing_bar_i == 0 {
+                    self.playing_bar_i = self.now_playing.len();
+                } else {
+                    self.playing_bar_i -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if self.playing_bar_i == self.now_playing.len() {
+                    self.playing_bar_i = 0;
                     return;
                 }
-                self.volume += 0.1;
-                self.sink.set_volume(self.volume);
+                self.playing_bar_i += 1;
             }
             _ => {}
         }
@@ -259,32 +277,36 @@ impl App {
     fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Left => {
-                self.shown_playlist = None;
+                self.current_playlist = if self.current_playlist.is_none() {
+                    Some(self.playlists[self.playlist_i].clone())
+                } else {
+                    None
+                };
             }
             KeyCode::Backspace => {
                 self.new_playlist_name.pop();
             }
             KeyCode::Char(c) => {
-                if self.adding_playlist {
+                if self.is_adding_list {
                     self.new_playlist_name.push(c);
                     return;
                 }
                 match c {
-                    'n' => self.adding_playlist = true,
+                    'n' => self.is_adding_list = true,
                     's' => serialize::serialize(&self.playlists, &self.glob_data.playlist_path),
                     _ => {}
                 }
             }
             KeyCode::Enter => {
-                if self.shown_playlist.is_some() {
-                    for song in self.shown_playlist.clone().unwrap().songs {
-                        self.listening_songs.push_back(song);
+                if self.current_playlist.is_some() {
+                    for song in self.current_playlist.clone().unwrap().songs {
+                        self.now_playing.push_back(song);
                     }
                     return;
                 }
 
-                if !self.adding_playlist && self.playlists.len() != 0{
-                    self.shown_playlist = Some(self.playlists[self.playlist_index].clone())
+                if !self.is_adding_list && self.playlists.len() != 0{
+                    self.current_playlist = Some(self.playlists[self.playlist_i].clone())
                 }
                 if self.new_playlist_name.len() == 0 {
                     return;
@@ -292,20 +314,20 @@ impl App {
                 let new_playlist = Playlist::new(self.new_playlist_name.clone());
                 self.playlists.push(new_playlist);
                 self.new_playlist_name = String::new();
-                self.adding_playlist = false;
+                self.is_adding_list = false;
             }
             KeyCode::Up => {
-                if self.playlist_index == 0 {
-                    self.playlist_index = self.playlists.len() - 1;
+                if self.playlist_i == 0 {
+                    self.playlist_i = self.playlists.len() - 1;
                 } else {
-                    self.playlist_index -= 1;
+                    self.playlist_i -= 1;
                 }
             }
             KeyCode::Down => {
-                if self.playlist_index == self.playlists.len() - 1 {
-                    self.playlist_index = 0;
+                if self.playlist_i == self.playlists.len() - 1 {
+                    self.playlist_i = 0;
                 } else {
-                    self.playlist_index += 1;
+                    self.playlist_i += 1;
                 }
             }
             _ => {}

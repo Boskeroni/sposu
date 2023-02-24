@@ -51,7 +51,7 @@ fn main() -> Result<(), io::Error>{
 fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
         if app.sink.empty() {
-            app.play_next_song()
+            app.play_selected_song()
         }
         if crossterm::event::poll(Duration::from_millis(20))? {
             if let Event::Key(key) = event::read()? {
