@@ -4,6 +4,7 @@ use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::event::{EnableMouseCapture, Event, self, DisableMouseCapture};
 use crossterm::execute;
+use playlist::Playlist;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
 use std::io;
@@ -12,7 +13,7 @@ mod osu;
 mod renderer;
 mod app;
 mod serialize;
-mod playlists;
+mod playlist;
 
 use app::*;
 
@@ -39,7 +40,7 @@ fn main() -> Result<(), io::Error>{
         }
     };
 
-    let playlists = serialize::deserialize(&global_data.playlist_path).unwrap();
+    let playlists = Playlist::from_serialized(global_data.playlist_path.clone());
 
     let app = App::new(songs, global_data, playlists);
     let res = main_loop(&mut terminal, app);
@@ -57,8 +58,8 @@ fn main() -> Result<(), io::Error>{
 /// RUNS THE APP
 fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
-        if app.sink.empty() {
-            app.play_selected_song()
+        if app.player.sink.empty() {
+            app.player.play_selected_song()
         }
         if crossterm::event::poll(Duration::from_millis(20))? {
             if let Event::Key(key) = event::read()? {

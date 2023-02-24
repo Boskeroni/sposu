@@ -113,7 +113,7 @@ fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 
 /// RENDERS THE CURRENTLY LISTENING TO BIT
 fn listening_to<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
-    let playlist_items: Vec<ListItem> = app.now_playing.iter().enumerate().map(|(i, s)| {
+    let playlist_items: Vec<ListItem> = app.player.current_songs.iter().enumerate().map(|(i, s)| {
         let style = if i == app.currently_playing_i {
             Style::default().fg(Color::Green)
         } else if i == app.playing_bar_i {
@@ -147,7 +147,7 @@ fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     } else {
 
         let song = app.displayed_songs[app.query_i].clone();
-        let path = app.to_valid_path(&song.audio_path);
+        let path = format!("{}/{}", app.glob_data.song_path, song.audio_path);
         let length_mult = match song.modifier { 
             Mod::NoMod => 1.0,
             _ => 1.5,
@@ -199,7 +199,7 @@ fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
         _ => Style::default(),
     };
 
-    let list = match app.current_playlist.is_none() {
+    let list = match app.shown_playlist.is_none() {
         true => get_outer_playlist(app, style),
         false => get_inner_playlist(app, style)
     };
@@ -208,9 +208,9 @@ fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 
 /// RETURNS LIST OF SONGS INSIDE PLAYLIST
 fn get_inner_playlist(app: &App, style: Style) -> List {
-    let playlist = app.current_playlist.clone().unwrap();
+    let playlist = app.shown_playlist.clone().unwrap();
 
-    let title = format!("name: {}|shuffle: {}|repeat: {}|", playlist.name, playlist.shuffle_on, playlist.repeat_on);
+    let title = format!("name: {} |shuffle: {} |repeat: {} |", playlist.name, playlist.shuffle_on, playlist.repeat_on);
     let list_items: Vec<ListItem> = playlist.songs.iter().map(|s| {
         ListItem::new(Text::from(Spans::from(Span::raw(s.song_name.clone()))))
     }).collect();
