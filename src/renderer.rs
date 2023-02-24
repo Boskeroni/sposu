@@ -113,11 +113,14 @@ fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 /// RENDERS THE CURRENTLY LISTENING TO BIT
 fn listening_to<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let playlist_items: Vec<ListItem> = app.now_playing.iter().enumerate().map(|(i, s)| {
-        let style = if i == app.playing_bar_i {
+        let style = if i == app.currently_playing_i {
+            Style::default().fg(Color::Green)
+        } else if i == app.playing_bar_i {
             Style::default().fg(Color::Red)
         } else {
-            Style::default().fg(Color::White)
+            Style::default()
         };
+
         let content = vec![
             Span::styled(&s.song_name, style),
         ];
@@ -149,13 +152,12 @@ fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
             _ => 1.5,
         };
         
-        let file_length = (mp3_duration::from_path(path).unwrap().as_secs() as f32 / length_mult) as usize;
-        let formatted_secs = if file_length%60 < 10 {
-            format!("0{}", file_length%60)
-        } else {
-            format!("{}", file_length%60)
+        let real_file_length = match mp3_duration::from_path(path) {
+            Ok(l) => l.as_secs(),
+            Err(e) => e.at_duration.as_secs(),
         };
-        let formatted_length = format!("{}:{}", file_length/60, formatted_secs);
+        let modded_length = (real_file_length as f64 / length_mult) as usize;
+        let formatted_length = format!("{}:{:02}", modded_length/60, modded_length%60);
         vec![
             to_raw_listitem(format!("TITLE: {}", &song.song_name)),
             to_raw_listitem(format!("ARTIST: {}", &song.artist)),
