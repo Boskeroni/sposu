@@ -22,7 +22,7 @@ pub struct AppData {
 pub struct App {
     pub current_ui: UIMode,
     pub query: String,
-    pub displayed_songs: Vec<Song>,
+    pub queried_songs: Vec<Song>,
     pub playlists: Vec<Playlist>,
     pub playlist_i: usize,
     pub query_i: usize,
@@ -43,7 +43,7 @@ impl App {
         Self {
             query: String::new(),
             all_songs: songs.clone(),
-            displayed_songs: songs,
+            queried_songs: songs,
             query_i: 0,
             current_ui: UIMode::SongQueue,
             playlists,
@@ -99,10 +99,10 @@ impl App {
 
     /// GETS ALL THE MATCHING SONGS FROM SEARCH QUERY
     pub fn get_matching_songs(&mut self) {
-        self.displayed_songs = vec![];
+        self.queried_songs = vec![];
         for song in self.all_songs.clone() {
             if song.song_name.to_lowercase().contains(&self.query.to_lowercase()) {
-                self.displayed_songs.push(song);
+                self.queried_songs.push(song);
             }
         }
     }
@@ -115,31 +115,31 @@ impl App {
                 if self.playlists.len() == 0 {
                     return;
                 }
-                if self.displayed_songs.len() == 0 {
+                if self.queried_songs.len() == 0 {
                     return;
                 }
-                let new_song = self.displayed_songs[self.query_i].clone();
+                let new_song = self.queried_songs[self.query_i].clone();
                 self.playlists[self.playlist_i].songs.push(new_song);
                 if self.shown_playlist.is_some() {
                     self.shown_playlist = Some(self.playlists[self.playlist_i].clone());
                 }
             }
             KeyCode::Left => {
-                if self.displayed_songs.len() == 0 {
+                if self.queried_songs.len() == 0 {
                     return;
                 }
-                let current_mod = self.displayed_songs[self.query_i].modifier;
-                self.displayed_songs[self.query_i].modifier = match current_mod {
+                let current_mod = self.queried_songs[self.query_i].modifier;
+                self.queried_songs[self.query_i].modifier = match current_mod {
                     Mod::NoMod => Mod::DoubleTime,
                     Mod::DoubleTime => Mod::Nightcore,
                     Mod::Nightcore => Mod::NoMod,
                 }
             }
             KeyCode::Enter => {
-                if self.displayed_songs.len() == 0 {
+                if self.queried_songs.len() == 0 {
                     return;
                 }
-                let new_song = self.displayed_songs[self.query_i].clone();
+                let new_song = self.queried_songs[self.query_i].clone();
                 self.player.current_songs.push_back(new_song);
             }
             KeyCode::Char(e) => {
@@ -152,7 +152,7 @@ impl App {
                 self.get_matching_songs();
             }
             KeyCode::Down => {
-                if self.query_i != self.displayed_songs.len() - 1{
+                if self.query_i != self.queried_songs.len() - 1{
                     self.query_i += 1;
                 }
             }

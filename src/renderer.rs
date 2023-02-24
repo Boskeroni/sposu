@@ -72,11 +72,40 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     f.render_widget(input_block, area);
 }
 
+fn get_display_song_range(rows: usize, index: usize, songs_len: usize) -> (usize, usize) {
+    if index < rows / 2 {
+        let height = if rows > songs_len {
+            songs_len
+        } else {
+            rows
+        };
+        return (0, height)
+    }
+    
+    if rows > songs_len {
+        return (0, songs_len)
+    }
+
+    let height = if index + (rows / 2) > songs_len {
+        songs_len
+    } else {
+        index + (rows / 2)
+    };
+    return (index - (rows / 2), height)
+    
+}
+
 /// RENDERS THE RESULTS FROM THE SEARCH BAR
 fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
-    let list_items: Vec<ListItem> = app.displayed_songs.iter().enumerate().map(|(i, song)| {
+    let rows = area.height - 2;
+    let (bottom, top) = get_display_song_range(rows as usize, app.query_i, app.queried_songs.len());
+
+    let used_vec = &app.queried_songs[bottom..top];
+    let new_query_i = app.query_i - bottom;
+
+    let list_items: Vec<ListItem> = used_vec.iter().enumerate().map(|(i, song)| {
         let (chosen_symbol, line_style) = 
-            if app.query_i == i {
+            if new_query_i == i {
                 (">", Style::default().fg(Color::Red))
             } else {
                 (" ", Style::default())
@@ -141,11 +170,11 @@ fn listening_to<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let to_raw_listitem = |i| {ListItem::new(Text::from(Spans::from(Span::raw(i))))};
     
-    let content = if app.displayed_songs.len() == 0 {
+    let content = if app.queried_songs.len() == 0 {
         vec![to_raw_listitem(format!("No song selected"))]
     } else {
 
-        let song = app.displayed_songs[app.query_i].clone();
+        let song = app.queried_songs[app.query_i].clone();
         let path = format!("{}/{}", app.glob_data.song_path, song.audio_path);
         let length_mult = match song.modifier { 
             Mod::NoMod => 1.0,
