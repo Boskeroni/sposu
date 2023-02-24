@@ -49,8 +49,10 @@ pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
     song_info(app, f, right_chunks[1]);
 
     // renders the playlist block including new bar if needed
-    if app.is_adding_list { new_playlist_ui(app, f, right_chunks[2]); } 
-    else { basic_playlist(app, f, right_chunks[2]); }
+    match app.is_adding_list {
+        true => new_playlist_ui(app, f, right_chunks[2]),
+        false => basic_playlist(app, f, right_chunks[2]),
+    }
 
     // sets the cursor to the input field
     f.set_cursor(left_chunks[1].x + app.query.width() as u16 + 1, left_chunks[0].y + 1);
@@ -73,31 +75,28 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 /// RENDERS THE RESULTS FROM THE SEARCH BAR
 fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let list_items: Vec<ListItem> = app.displayed_songs.iter().enumerate().map(|(i, song)| {
-        let (chosen_symbol, mod_text) = if i == app.query_i {
-            let mod_text = if let UIMode::Input = app.current_ui {
-                match song.modifier {
-                    Mod::NoMod => "<NoMod>",
-                    Mod::DoubleTime => "<DoubleTime>",
-                    Mod::Nightcore => "<Nightcore>",
-                }
+        let (chosen_symbol, line_style) = 
+            if app.query_i == i {
+                (">", Style::default().fg(Color::Red))
             } else {
-                " "
+                (" ", Style::default())
             };
-
-            (">", mod_text)
-        } else {
-            (" ", " ")
+        let mod_text = match song.modifier {
+            Mod::NoMod => "<NM>",
+            Mod::DoubleTime => "<DT>",
+            Mod::Nightcore => "<NC>"
         };
         let line_content = vec![
             Span::styled(chosen_symbol, Style::default().fg(Color::Red)),
+            Span::raw("|"),
+            Span::styled(mod_text, Style::default().fg(Color::Cyan)),
             Span::raw("|"),
             Span::styled(&song.artist, Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(": "),
             Span::styled(&song.song_name, Style::default().fg(Color::Green)),
             Span::raw(" "),
-            Span::styled(mod_text, Style::default().fg(Color::Cyan))
         ];
-        ListItem::new(Text::from(Spans::from(line_content)))
+        ListItem::new(Text::from(Spans::from(line_content))).style(line_style)
     }).collect();
 
     let style = match app.current_ui {
@@ -106,7 +105,7 @@ fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     };
 
     let shown_songs_block = List::new(list_items)
-        .block(Block::default().style(style).title("songs").borders(Borders::ALL).border_type(BorderType::Rounded))
+        .block(Block::default().title("songs").borders(Borders::ALL).border_type(BorderType::Rounded).border_style(style))
         .highlight_symbol(">>");
     f.render_widget(shown_songs_block, area);
 }
