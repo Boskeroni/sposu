@@ -163,7 +163,7 @@ fn playbar<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     }).collect();
 
     let style = match app.current_ui {
-        UIMode::SongQueue => Style::default().add_modifier(Modifier::ITALIC).fg(Color::Yellow),
+        UIMode::PlayBar => Style::default().add_modifier(Modifier::ITALIC).fg(Color::Yellow),
         _ => Style::default().add_modifier(Modifier::ITALIC)
     };
 

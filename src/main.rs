@@ -63,10 +63,9 @@ fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result
         }
         if crossterm::event::poll(Duration::from_millis(20))? {
             if let Event::Key(key) = event::read()? {
-                if let Err(_) = app.global_handler(&key) {
+                if let Err(_) = app.event_handler(&key) {
                     return Ok(())
-                };
-                app.specific_handler(&key);
+                }
             }
         }
         terminal.draw(|f| renderer::render(f, &app))?;

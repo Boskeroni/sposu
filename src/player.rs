@@ -5,7 +5,7 @@ use rodio::{Sink, OutputStream, OutputStreamHandle};
 use serde::{Deserialize, Serialize};
 use crate::{osu::{Song, Mod}, serialize::{deserialize, self}};
 
-pub enum CurrentlyPlaying {
+pub enum PlayBarOutput {
     None,
     Playlist,
     Normal,
@@ -15,7 +15,7 @@ pub struct Player {
     pub sink: Sink,
     pub _stream: OutputStream,
     pub stream_handle: OutputStreamHandle,
-    pub currently_playing: CurrentlyPlaying,
+    pub playbar_output: PlayBarOutput,
     pub current_songs: Vec<Song>,
     pub current_playlist: Option<Playlist>,
     pub hovered_index: usize,
@@ -29,12 +29,12 @@ impl Player {
     pub fn new(parent_path: String) -> Self {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::new_idle().0;
-        let currently_playing = CurrentlyPlaying::None;
+        let currently_playing = PlayBarOutput::None;
         Self {
             sink,
             _stream,
             stream_handle,
-            currently_playing,
+            playbar_output: currently_playing,
             current_songs: Vec::new(),
             current_playlist: None,
             hovered_index: 0,
@@ -50,13 +50,12 @@ impl Player {
         if self.playing_index == self.hovered_index {
             self.sink.stop();
         }
-        println!("{}", self.hovered_index);
         self.current_songs.remove(self.hovered_index);
     }
 
     // removes the playlist from the whole struct
-    pub fn pop_playlist(&mut self) -> Playlist {
-        self.currently_playing = CurrentlyPlaying::None;
+    pub fn pop_current_playlist(&mut self) -> Playlist {
+        self.playbar_output = PlayBarOutput::None;
         let temp = self.current_playlist.clone().unwrap();
         self.current_playlist = None;
         temp
@@ -71,20 +70,21 @@ impl Player {
     pub fn load_playbar_playlist(&mut self) {
         self.current_songs = Vec::new();
         self.current_songs.append(&mut self.current_playlist.clone().unwrap().songs.clone());
-        self.currently_playing = CurrentlyPlaying::Playlist;
+        self.playbar_output = PlayBarOutput::Playlist;
         self.playing_index = 0;
     }
 
     // removes the playlist from the playbar
-    pub fn _unload_playbar_playlist(&mut self) {
+    pub fn unload_playbar_playlist(&mut self) {
         self.current_songs = Vec::new();
-        self.currently_playing = CurrentlyPlaying::None;
+        self.playbar_output = PlayBarOutput::None;
+        self.sink.stop();
     }
 
     // adds regular song
     pub fn add_normal_song(&mut self, song: Song) {
         self.current_songs.push(song);
-        self.currently_playing = CurrentlyPlaying::Normal;
+        self.playbar_output = PlayBarOutput::Normal;
     }
 
     // function used when enter is pressed on now playing
@@ -104,8 +104,8 @@ impl Player {
             return;
         }
 
-        let new_song = match self.currently_playing {
-            CurrentlyPlaying::Playlist => {
+        let new_song = match self.playbar_output {
+            PlayBarOutput::Playlist => {
                 let data = self.current_playlist.clone().unwrap().get_next_song();
                 if data.is_none() { return; }
                 
@@ -113,11 +113,12 @@ impl Player {
                 self.playing_index = index;
                 song
             }
-            CurrentlyPlaying::Normal => {
+            PlayBarOutput::Normal => {
                 if self.is_playing {
                     self.current_songs.remove(self.playing_index);
                 }
                 if self.current_songs.is_empty() {
+                    self.is_playing = false;
                     return;
                 }
 
@@ -146,6 +147,8 @@ impl Player {
 
         self.sink.set_speed(speed);
         self.sink.set_volume(self.volume);
+
+        self.is_playing = true;
     }
 }
 

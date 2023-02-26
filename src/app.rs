@@ -2,12 +2,12 @@ use serde::{Serialize, Deserialize};
 use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::{Song, Mod};
-use crate::player::{Playlist, Player, serialize_playlists};
+use crate::player::{Playlist, Player, serialize_playlists, PlayBarOutput};
 
 #[derive(Copy, Clone, Debug)]
 pub enum UIMode {
     Input,
-    SongQueue,
+    PlayBar,
     Playlist,
 }
 
@@ -42,7 +42,7 @@ impl App {
             all_songs: songs.clone(),
             queried_songs: songs,
             query_i: 0,
-            current_ui: UIMode::SongQueue,
+            current_ui: UIMode::PlayBar,
             playlists,
             playlist_i: 0,
             new_playlist_name: String::new(),
@@ -53,42 +53,35 @@ impl App {
     }
 
     /// HANDLES THE EVENTS WHICH MATTER REGARDLESS OF STATE
-    pub fn global_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
-        match key.code {
-            KeyCode::Tab => {
-                match self.current_ui {
-                    UIMode::Input => self.current_ui = UIMode::Playlist,
-                    UIMode::Playlist => self.current_ui = UIMode::SongQueue,
-                    UIMode::SongQueue => self.current_ui = UIMode::Input,
+    pub fn event_handler(&mut self, key: &KeyEvent) -> Result<(), i32> {
+        // handle the only bit that can error first
+        if let KeyCode::Esc = key.code {
+            if let UIMode::PlayBar = self.current_ui {
+                match self.player.playbar_output {
+                    PlayBarOutput::Playlist => {},
+                    _ => return Err(1)
                 }
             }
-            KeyCode::Esc => {
-                match self.current_ui {
-                    UIMode::SongQueue => return Err(1),
-                    _ => self.current_ui = UIMode::SongQueue,
-                }
-            }
-            _ => {}
         }
-        return Ok(())
-    }
 
-    /// RELEGATES THE OTHER EVENTS TO THEIR SPECIFIC STATES
-    pub fn specific_handler(&mut self, key: &KeyEvent) {
-        match self.current_ui {
-            UIMode::Input => {
-                self.input_handler(key);
+        // TAB is global thing which does the same thing
+        if let KeyCode::Tab = key.code {
+            match self.current_ui {
+                UIMode::Input => self.current_ui = UIMode::Playlist,
+                UIMode::Playlist => self.current_ui = UIMode::PlayBar,
+                UIMode::PlayBar => self.current_ui = UIMode::Input,
             }
-            UIMode::SongQueue => {
-                match key.code {
-                    KeyCode::Esc => {},
-                    _ => self.play_now_handler(key)
-                }
-            }
-            UIMode::Playlist => {
-                self.playlist_handler(key);
-            }
+            return Ok(())
         }
+
+        // relegate input to the other functions
+        match self.current_ui {
+            UIMode::Input => self.search_mode_handler(key),
+            UIMode::Playlist => self.playlist_handler(key),
+            UIMode::PlayBar => self.play_bar_handler(key)
+        }
+
+        return Ok(())
     }
 
     /// GETS ALL THE MATCHING SONGS FROM SEARCH QUERY
@@ -102,8 +95,16 @@ impl App {
     }
 
     /// HANDLES INPUT FOR SONG QUERY BLOCK
-    fn input_handler(&mut self, key: &KeyEvent) {
+    fn search_mode_handler(&mut self, key: &KeyEvent) {
         match key.code {
+            KeyCode::Esc => {
+                if self.query.len() != 0 {
+                    self.query = String::new();
+                    self.get_matching_songs();
+                    return;
+                }
+                self.current_ui = UIMode::PlayBar;
+            }
             // adds song to playlsit
             KeyCode::Right => {
                 if self.playlists.len() == 0 {
@@ -170,8 +171,12 @@ impl App {
     }
 
     /// HANDLES INPUT FOR NOW PLAYING BLOCK
-    fn play_now_handler(&mut self, key: &KeyEvent) {
+    fn play_bar_handler(&mut self, key: &KeyEvent) {
         match key.code {
+            KeyCode::Esc => {
+                // if it makes it here, we know user wants to unload playlist
+                self.player.unload_playbar_playlist(); 
+            }
             // plays song currently being hovered
             KeyCode::Enter => self.player.force_new_song(),
             // pause / unpause song
@@ -206,10 +211,22 @@ impl App {
     /// HANDLES INPUT FOR PLAYLISTS
     fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
+            KeyCode::Esc => {
+                // makes sense to have two ways to remove playlist
+                if let PlayBarOutput::Playlist = self.player.playbar_output {
+                    self.player.unload_playbar_playlist();
+                    return;
+                }
+                if self.player.current_playlist.is_some() {
+                    self.player.pop_current_playlist();
+                    return;
+                }
+                self.current_ui = UIMode::PlayBar;
+            }
             // unloads the playlsit
             KeyCode::Left => {
                 if self.player.current_playlist.is_some() {
-                    self.playlists[self.playlist_i] = self.player.pop_playlist();
+                    self.playlists[self.playlist_i] = self.player.pop_current_playlist();
                 }
             }
             // removes char from new playlist
