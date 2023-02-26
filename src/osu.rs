@@ -67,11 +67,13 @@ pub fn load_songs(song_path: &str) -> Vec<Song> {
 
             let osu_file_reader = BufReader::new(File::open(&file.path()).unwrap());    
             if let Ok(i) = Beatmap::parse(osu_file_reader) {
+                // dont add duplicate songs.
                 let name_artist = format!("{}-{}", i.title, i.artist);
                 if used_songs.iter().any(|e| e == &name_artist) {
                     continue;
                 }
                 used_songs.push(name_artist);
+                // remove the parent path to use the global path when loaded
                 let path = folder.path().to_string_lossy().replace(&song_path, "");
                 songs.push(Song::new(i, path));
                 mp3_ratio -= 1;

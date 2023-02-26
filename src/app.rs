@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::{Song, Mod};
-use crate::playlist::{Playlist, Player, serialize_playlists};
+use crate::player::{Playlist, Player, serialize_playlists};
 
 #[derive(Copy, Clone, Debug)]
 pub enum UIMode {
@@ -28,11 +28,8 @@ pub struct App {
     pub query_i: usize,
     pub new_playlist_name: String,
     pub is_adding_list: bool,
-    pub playing_bar_i: usize,
-    pub currently_playing_i: usize,
     pub glob_data: AppData,
     pub player: Player,
-    pub shown_playlist: Option<Playlist>,
     all_songs: Vec<Song>,
     
 }
@@ -51,10 +48,7 @@ impl App {
             new_playlist_name: String::new(),
             is_adding_list: false,
             glob_data,
-            playing_bar_i: 0,
-            currently_playing_i: 0,
             player,
-            shown_playlist: None,
         }
     }
 
@@ -71,7 +65,7 @@ impl App {
             KeyCode::Esc => {
                 match self.current_ui {
                     UIMode::SongQueue => return Err(1),
-                    _ => self.current_ui = UIMode::SongQueue
+                    _ => self.current_ui = UIMode::SongQueue,
                 }
             }
             _ => {}
@@ -110,7 +104,7 @@ impl App {
     /// HANDLES INPUT FOR SONG QUERY BLOCK
     fn input_handler(&mut self, key: &KeyEvent) {
         match key.code {
-            // adds new song to the playlist
+            // adds song to playlsit
             KeyCode::Right => {
                 if self.playlists.len() == 0 {
                     return;
@@ -120,10 +114,11 @@ impl App {
                 }
                 let new_song = self.queried_songs[self.query_i].clone();
                 self.playlists[self.playlist_i].songs.push(new_song);
-                if self.shown_playlist.is_some() {
-                    self.shown_playlist = Some(self.playlists[self.playlist_i].clone());
+                if self.player.current_playlist.is_some() {
+                    self.player.current_playlist = Some(self.playlists[self.playlist_i].clone());
                 }
             }
+            // changes the mod of the song
             KeyCode::Left => {
                 if self.queried_songs.len() == 0 {
                     return;
@@ -135,31 +130,40 @@ impl App {
                     Mod::Nightcore => Mod::NoMod,
                 }
             }
+            // adds song to playbar
             KeyCode::Enter => {
                 if self.queried_songs.len() == 0 {
                     return;
                 }
                 let new_song = self.queried_songs[self.query_i].clone();
-                self.player.current_songs.push_back(new_song);
+                self.player.add_normal_song(new_song);
             }
+            // adds char to search query
             KeyCode::Char(e) => {
                 self.query.push(e);
                 self.get_matching_songs();
                 self.query_i = 0;
             }
+            // backspace on search query
             KeyCode::Backspace => {
                 self.query.pop();
                 self.get_matching_songs();
             }
+            // move down results
             KeyCode::Down => {
                 if self.query_i != self.queried_songs.len() - 1{
                     self.query_i += 1;
+                    return;
                 }
+                self.query_i = 0;
             }
+            // move up results
             KeyCode::Up => {
                 if self.query_i != 0 {
                     self.query_i -= 1;
+                    return;
                 }
+                self.query_i = self.queried_songs.len() - 1;
             }
             _ => {}
         }
@@ -168,22 +172,9 @@ impl App {
     /// HANDLES INPUT FOR NOW PLAYING BLOCK
     fn play_now_handler(&mut self, key: &KeyEvent) {
         match key.code {
-            KeyCode::Left => {
-                if self.playlists.len() == 0 {
-                    return;
-                }
-                let playlist = self.playlists[self.playlist_i].clone();
-                for song in playlist.songs {
-                    self.player.current_songs.push_back(song);
-                }
-            }
-            KeyCode::Enter => {
-                if self.playing_bar_i == self.currently_playing_i {
-                    return;
-                }
-                self.player.play_selected_song();
-            }
-
+            // plays song currently being hovered
+            KeyCode::Enter => self.player.force_new_song(),
+            // pause / unpause song
             KeyCode::Char(' ') => {
                 if self.player.sink.is_paused() {
                     self.player.sink.play();
@@ -191,26 +182,22 @@ impl App {
                 }
                 self.player.sink.pause();
             }
-            KeyCode::Delete => {
-                if self.playing_bar_i == self.currently_playing_i {
-                    self.player.sink.stop();
-                    return;
-                }
-                self.player.current_songs.remove(self.playing_bar_i);
-            }
+            // remove hovered song from playbar
+            KeyCode::Delete => self.player.remove_hovered_song(),
+            // move hover up playbar
             KeyCode::Up => {
-                if self.playing_bar_i == 0 {
-                    self.playing_bar_i = self.player.current_songs.len();
-                } else {
-                    self.playing_bar_i -= 1;
-                }
-            }
-            KeyCode::Down => {
-                if self.playing_bar_i == self.player.current_songs.len() {
-                    self.playing_bar_i = 0;
+                if self.player.hovered_index == 0 {
+                    self.player.hovered_index = self.player.current_songs.len() - 1;
                     return;
                 }
-                self.playing_bar_i += 1;
+                self.player.hovered_index -= 1;
+            }
+            // move hover down playbar
+            KeyCode::Down => {
+                self.player.hovered_index += 1;
+                if self.player.hovered_index == self.player.current_songs.len() {
+                    self.player.hovered_index = 0;
+                }
             }
             _ => {}
         }
@@ -219,51 +206,58 @@ impl App {
     /// HANDLES INPUT FOR PLAYLISTS
     fn playlist_handler(&mut self, key: &KeyEvent) {
         match key.code {
+            // unloads the playlsit
             KeyCode::Left => {
-                self.shown_playlist = if self.shown_playlist.is_none() {
-                    Some(self.playlists[self.playlist_i].clone())
-                } else {
-                    None
-                };
+                if self.player.current_playlist.is_some() {
+                    self.playlists[self.playlist_i] = self.player.pop_playlist();
+                }
             }
+            // removes char from new playlist
             KeyCode::Backspace => {
                 self.new_playlist_name.pop();
             }
             KeyCode::Char(c) => {
+                // checks if char is for new name
                 if self.is_adding_list {
                     self.new_playlist_name.push(c);
                     return;
                 }
+                // matches it to shortcuts
                 match c {
                     'n' => self.is_adding_list = true,
                     'q' => serialize_playlists(&self.playlists, &self.glob_data.playlist_path.clone()),
                     'w' => {
-                        if self.shown_playlist.is_some() {
-                            self.playlists[self.playlist_i].repeat_on = !self.playlists[self.playlist_i].repeat_on;
+                        // change the playlist stored in the player and return it to the vec when finished.
+                        if let Some(mut p) = self.player.current_playlist.clone() {
+                            p.toggle_repeat();
+                            self.player.current_playlist = Some(p);
                         }
                     }
                     'e' => {
-                        if self.shown_playlist.is_some() {
-                            self.playlists[self.playlist_i].shuffle_on = self.playlists[self.playlist_i].shuffle_on;
+                        if let Some(mut p) = self.player.current_playlist.clone() {
+                            p.toggle_shuffle();
+                            self.player.current_playlist = Some(p);
                         }
-                    }
+                    },
                     _ => {}
                 }
             }
             KeyCode::Enter => {
-                if self.shown_playlist.is_some() {
-                    for song in self.shown_playlist.clone().unwrap().songs {
-                        self.player.current_songs.push_back(song);
-                    }
+                // loads current playlist into now playing bar
+                if self.player.current_playlist.is_some() {
+                    self.player.load_playbar_playlist();
                     return;
                 }
-
+                // loads song to player
                 if !self.is_adding_list && self.playlists.len() != 0{
-                    self.shown_playlist = Some(self.playlists[self.playlist_i].clone())
+                    self.player.load_playlist(self.playlists[self.playlist_i].clone());
                 }
+                // cant make a new list without a name
                 if self.new_playlist_name.len() == 0 {
                     return;
                 }
+
+                // creates the playlist
                 let new_playlist = Playlist::new(self.new_playlist_name.clone());
                 self.playlists.push(new_playlist);
                 self.new_playlist_name = String::new();

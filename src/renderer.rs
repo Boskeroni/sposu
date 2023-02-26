@@ -43,7 +43,7 @@ pub fn render<B: Backend>(f: &mut Frame<B>, app: &App) {
     song_search(app, f, left_chunks[1]);
     
     // renders the plan to listen bit
-    listening_to(app, f, right_chunks[0]);
+    playbar(app, f, right_chunks[0]);
 
     // renders the information for the songs
     song_info(app, f, right_chunks[1]);
@@ -140,17 +140,23 @@ fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 }
 
 /// RENDERS THE CURRENTLY LISTENING TO BIT
-fn listening_to<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
+fn playbar<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let playlist_items: Vec<ListItem> = app.player.current_songs.iter().enumerate().map(|(i, s)| {
-        let style = if i == app.currently_playing_i {
+        let symbol = if i == app.player.hovered_index {
+            ">"
+        } else {
+            " "
+        };
+
+        let style = if i == app.player.playing_index {
             Style::default().fg(Color::Green)
-        } else if i == app.playing_bar_i {
-            Style::default().fg(Color::Red)
         } else {
             Style::default()
         };
 
         let content = vec![
+            Span::styled(symbol, Style::default().fg(Color::Red)),
+            Span::raw("|"),
             Span::styled(&s.song_name, style),
         ];
         ListItem::new(Text::from(Spans::from(content)))
@@ -227,7 +233,7 @@ fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
         _ => Style::default(),
     };
 
-    let list = match app.shown_playlist.is_none() {
+    let list = match app.player.current_playlist.is_none() {
         true => get_outer_playlist(app, style),
         false => get_inner_playlist(app, style)
     };
@@ -236,7 +242,7 @@ fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 
 /// RETURNS LIST OF SONGS INSIDE PLAYLIST
 fn get_inner_playlist(app: &App, style: Style) -> List {
-    let playlist = app.shown_playlist.clone().unwrap();
+    let playlist = app.player.current_playlist.clone().unwrap();
 
     let title = format!("name: {} |shuffle: {} |repeat: {} |", playlist.name, playlist.shuffle_on, playlist.repeat_on);
     let list_items: Vec<ListItem> = playlist.songs.iter().map(|s| {
