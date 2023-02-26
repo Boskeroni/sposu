@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use crossterm::event::{KeyEvent, KeyCode};
 
 use crate::osu::{Song, Mod};
-use crate::player::{Playlist, Player, serialize_playlists, PlayBarOutput};
+use crate::player::{Playlist, Player, serialize_playlists, PlaybarSource};
 
 #[derive(Copy, Clone, Debug)]
 pub enum UIMode {
@@ -31,7 +31,6 @@ pub struct App {
     pub glob_data: AppData,
     pub player: Player,
     all_songs: Vec<Song>,
-    
 }
 
 impl App {
@@ -57,8 +56,8 @@ impl App {
         // handle the only bit that can error first
         if let KeyCode::Esc = key.code {
             if let UIMode::PlayBar = self.current_ui {
-                match self.player.playbar_output {
-                    PlayBarOutput::Playlist => {},
+                match self.player.playbar_source {
+                    PlaybarSource::Playlist => {},
                     _ => return Err(1)
                 }
             }
@@ -219,7 +218,7 @@ impl App {
         match key.code {
             KeyCode::Esc => {
                 // makes sense to have two ways to remove playlist
-                if let PlayBarOutput::Playlist = self.player.playbar_output {
+                if let PlaybarSource::Playlist = self.player.playbar_source {
                     self.player.unload_playbar_playlist();
                     return;
                 }
@@ -281,7 +280,7 @@ impl App {
                 }
 
                 // creates the playlist
-                let new_playlist = Playlist::new(self.new_playlist_name.clone());
+                let new_playlist = Playlist::new_empty(self.new_playlist_name.clone());
                 self.playlists.push(new_playlist);
                 self.new_playlist_name = String::new();
                 self.is_adding_list = false;

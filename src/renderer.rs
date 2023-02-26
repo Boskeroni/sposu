@@ -72,6 +72,7 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     f.render_widget(input_block, area);
 }
 
+#[inline]
 fn song_range(rows: usize, index: usize, songs_len: usize) -> (usize, usize) {
     // if all of the songs can be displayed normally, dont bother
     if rows > songs_len {
@@ -84,13 +85,17 @@ fn song_range(rows: usize, index: usize, songs_len: usize) -> (usize, usize) {
     }
 
     // the range has to be shifted
-    let height = std::cmp::min(index + (rows/2), songs_len);
+    let height = std::cmp::min(index + (rows/2), songs_len) + 1;
     return (index - (rows / 2), height)
     
 }
 
 /// RENDERS THE RESULTS FROM THE SEARCH BAR
 fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
+    if area.height < 3 {
+        return;
+    }
+    
     let rows = area.height - 2;
     let (bottom, top) = song_range(rows as usize, app.query_i, app.queried_songs.len());
 
