@@ -16,23 +16,24 @@ pub struct Song {
     pub song_name: String,
     pub artist: String,
     pub modifier: Mod,
+    pub length: u64,
 }
 
 impl Song {
-    fn new(beatmap: Beatmap, song_path: String) -> Self {
-        let audio_path = format!("{}/{}", song_path, &beatmap.audio_filename);
+    fn new(beatmap: Beatmap, audio_path: String, length: u64) -> Self {
         Self { 
             audio_path,
             song_name: beatmap.title,
             artist: beatmap.artist,
-            modifier: Mod::NoMod
+            modifier: Mod::NoMod,
+            length
         }
     }
 }
 
 /// LOADS ALL THE SONGS IN THE SONG FOLDER PROVIDED
 /// IT ERRORS ON SOME OF THE FILES WHICH IS BAD BUT IDK HOW TO FIX IT
-pub fn load_songs(song_path: &str) -> Vec<Song> {
+pub fn load_all_songs(song_path: &str) -> Vec<Song> {
     let mut songs = Vec::new();
     let song_folder = fs::read_dir(song_path).unwrap();
     let mut used_songs = Vec::new();
@@ -73,9 +74,17 @@ pub fn load_songs(song_path: &str) -> Vec<Song> {
                     continue;
                 }
                 used_songs.push(name_artist);
+
+                let audio_path = format!("{}/{}", folder.path().to_string_lossy(), &i.audio_filename);
+                println!("{}", audio_path);
+                let length = match mp3_duration::from_path(&audio_path) {
+                    Ok(l) => l.as_secs(),
+                    Err(e) => e.at_duration.as_secs(),
+                };
+
                 // remove the parent path to use the global path when loaded
-                let path = folder.path().to_string_lossy().replace(&song_path, "");
-                songs.push(Song::new(i, path));
+                let path = audio_path.replace(song_path, "");
+                songs.push(Song::new(i, path, length));
                 mp3_ratio -= 1;
                 if mp3_ratio == 0 {
                     break;

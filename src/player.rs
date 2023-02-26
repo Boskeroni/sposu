@@ -180,21 +180,6 @@ impl Playlist {
         }
     }
 
-    pub fn from_serialized(path: &str) -> Vec<Self> {
-        let raw_data: Vec<SerializedPlaylist> = deserialize(path).unwrap();
-        let playlists = raw_data.iter().map(|p| {
-            Self {
-                name: p.name.clone(),
-                songs: p.songs.clone(),
-                shuffle_on: false,
-                repeat_on: false,
-                song_index: 0,
-                _hovered_index: 0,
-            }
-        }).collect();
-        playlists
-    }
-
     pub fn get_next_song(&mut self) -> Option<(Song, usize)> {
         if self.shuffle_on {
             let song_index = rand::thread_rng().gen_range(0..self.songs.len()-1);
@@ -231,4 +216,24 @@ pub fn serialize_playlists(playlists: &Vec<Playlist>, path: &str) {
     }).collect();
 
     serialize::serialize(&raw_data, path);
+}
+
+
+pub fn deserialize_playlist(path: &str) -> Option<Vec<Playlist>> {
+    let raw_data: Result<Vec<SerializedPlaylist>, _> = deserialize(path);
+    if raw_data.is_err() {
+        return None;
+    }
+    let playlist_data = raw_data.unwrap();
+    let playlists = playlist_data.iter().map(|p| {
+        Playlist {
+            name: p.name.clone(),
+            songs: p.songs.clone(),
+            shuffle_on: false,
+            repeat_on: false,
+            song_index: 0,
+            _hovered_index: 0,
+        }
+    }).collect();
+    Some(playlists)
 }

@@ -73,14 +73,14 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
 }
 
 fn song_range(rows: usize, index: usize, songs_len: usize) -> (usize, usize) {
-    // the index isnt big enough to warrant shifting the bottom
-    if index < rows / 2 {
-        return (0, std::cmp::min(rows, songs_len))
-    }
-
     // if all of the songs can be displayed normally, dont bother
     if rows > songs_len {
         return (0, songs_len)
+    }
+
+    // the index isnt big enough to warrant shifting the bottom
+    if index < rows / 2 {
+        return (0, std::cmp::min(rows, songs_len))
     }
 
     // the range has to be shifted
@@ -175,17 +175,12 @@ fn song_info<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     } else {
 
         let song = app.queried_songs[app.query_i].clone();
-        let path = format!("{}/{}", app.glob_data.song_path, song.audio_path);
         let length_mult = match song.modifier { 
             Mod::NoMod => 1.0,
             _ => 1.5,
         };
         
-        let real_file_length = match mp3_duration::from_path(path) {
-            Ok(l) => l.as_secs(),
-            Err(e) => e.at_duration.as_secs(),
-        };
-        let modded_length = (real_file_length as f64 / length_mult) as usize;
+        let modded_length = (song.length as f64 / length_mult) as usize;
         let formatted_length = format!("{}:{:02}", modded_length/60, modded_length%60);
         vec![
             to_raw_listitem(format!("TITLE: {}", &song.song_name)),

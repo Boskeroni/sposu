@@ -1,13 +1,12 @@
+use std::io;
 use std::thread;
 use std::time::Duration;
+use crossterm::execute;
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::event::{EnableMouseCapture, Event, self, DisableMouseCapture};
-use crossterm::execute;
-use player::Playlist;
-use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
-use std::io;
+use tui::backend::{Backend, CrosstermBackend};
 
 mod osu;
 mod renderer;
@@ -16,6 +15,8 @@ mod serialize;
 mod player;
 
 use app::*;
+use osu::Song;
+use player::deserialize_playlist;
 
 /// INITIALISES APP
 fn main() -> Result<(), io::Error>{
@@ -30,19 +31,8 @@ fn main() -> Result<(), io::Error>{
     let mut terminal = Terminal::new(backend)?;
 
     let mut global_data: AppData = serialize::deserialize::<AppData>("assets/data.json").unwrap();
-
-    let songs = match global_data.serialized_songs {
-        true => serialize::deserialize(&global_data.serialize_path).unwrap(),
-        false => {
-            let songs = osu::load_songs(&global_data.song_path);
-            serialize::serialize(&songs, &global_data.serialize_path);
-            global_data.serialized_songs = true;
-            serialize::serialize(&global_data, "assets/data.json");
-            songs
-        }
-    };
-
-    let playlists = Playlist::from_serialized(&global_data.playlist_path.clone());
+    let songs = get_songs(&mut global_data);
+    let playlists = deserialize_playlist(&global_data.playlist_path.clone()).unwrap();
 
     let app = App::new(songs, global_data, playlists);
     let res = main_loop(&mut terminal, app);
@@ -75,3 +65,17 @@ fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result
     }
 }
 
+fn get_songs(data: &mut AppData) -> Vec<Song> {
+    if data.serialized_songs {
+        let pot_data = serialize::deserialize(&data.serialize_path);
+        if pot_data.is_ok() {
+            return pot_data.unwrap();
+        }
+    }
+    let songs = osu::load_all_songs(&data.song_path);
+    println!("!");
+    serialize::serialize(&songs, &data.serialize_path);
+    data.serialized_songs = true;
+    serialize::serialize(data, "assets/data.json");
+    songs
+}
