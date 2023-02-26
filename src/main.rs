@@ -1,5 +1,6 @@
+use std::fs::OpenOptions;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::event::{EnableMouseCapture, Event, self, DisableMouseCapture};
@@ -8,6 +9,7 @@ use player::Playlist;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
 use std::io;
+use std::io::Write;
 
 mod osu;
 mod renderer;
@@ -57,7 +59,14 @@ fn main() -> Result<(), io::Error>{
 
 /// RUNS THE APP
 fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+    // i want to test the stability of each frame.
+    let mut log_file = OpenOptions::new().append(true).write(true).open("log.txt").unwrap();
+    let mut start = Instant::now();
     loop {
+        
+        writeln!(log_file, "{}", start.elapsed().as_micros()).unwrap();
+        start = Instant::now();
+        
         if app.player.sink.empty() {
             app.player.try_new_song()
         }

@@ -191,6 +191,9 @@ impl App {
             KeyCode::Delete => self.player.remove_hovered_song(),
             // move hover up playbar
             KeyCode::Up => {
+                if self.player.current_songs.is_empty() {
+                    return;
+                }
                 if self.player.hovered_index == 0 {
                     self.player.hovered_index = self.player.current_songs.len() - 1;
                     return;
@@ -199,6 +202,9 @@ impl App {
             }
             // move hover down playbar
             KeyCode::Down => {
+                if self.player.current_songs.is_empty() {
+                    return;
+                }
                 self.player.hovered_index += 1;
                 if self.player.hovered_index == self.player.current_songs.len() {
                     self.player.hovered_index = 0;

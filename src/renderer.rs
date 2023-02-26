@@ -72,25 +72,19 @@ fn song_input<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     f.render_widget(input_block, area);
 }
 
-fn get_display_song_range(rows: usize, index: usize, songs_len: usize) -> (usize, usize) {
+fn song_range(rows: usize, index: usize, songs_len: usize) -> (usize, usize) {
+    // the index isnt big enough to warrant shifting the bottom
     if index < rows / 2 {
-        let height = if rows > songs_len {
-            songs_len
-        } else {
-            rows
-        };
-        return (0, height)
+        return (0, std::cmp::min(rows, songs_len))
     }
-    
+
+    // if all of the songs can be displayed normally, dont bother
     if rows > songs_len {
         return (0, songs_len)
     }
 
-    let height = if index + (rows / 2) > songs_len {
-        songs_len
-    } else {
-        index + (rows / 2)
-    };
+    // the range has to be shifted
+    let height = std::cmp::min(index + (rows/2), songs_len);
     return (index - (rows / 2), height)
     
 }
@@ -98,7 +92,7 @@ fn get_display_song_range(rows: usize, index: usize, songs_len: usize) -> (usize
 /// RENDERS THE RESULTS FROM THE SEARCH BAR
 fn song_search<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     let rows = area.height - 2;
-    let (bottom, top) = get_display_song_range(rows as usize, app.query_i, app.queried_songs.len());
+    let (bottom, top) = song_range(rows as usize, app.query_i, app.queried_songs.len());
 
     let used_vec = &app.queried_songs[bottom..top];
     let new_query_i = app.query_i - bottom;
@@ -163,12 +157,12 @@ fn playbar<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     }).collect();
 
     let style = match app.current_ui {
-        UIMode::PlayBar => Style::default().add_modifier(Modifier::ITALIC).fg(Color::Yellow),
-        _ => Style::default().add_modifier(Modifier::ITALIC)
+        UIMode::PlayBar => Style::default().fg(Color::Yellow),
+        _ => Style::default()
     };
 
     let playlist_block = List::new(playlist_items)
-        .block(Block::default().style(style).title("currently playing").borders(Borders::ALL).border_type(BorderType::Rounded));
+        .block(Block::default().border_style(style).title("currently playing").borders(Borders::ALL).border_type(BorderType::Rounded));
     f.render_widget(playlist_block, area);
 }
 
