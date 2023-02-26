@@ -1,6 +1,5 @@
-use std::fs::OpenOptions;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::event::{EnableMouseCapture, Event, self, DisableMouseCapture};
@@ -9,7 +8,6 @@ use player::Playlist;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
 use std::io;
-use std::io::Write;
 
 mod osu;
 mod renderer;
@@ -31,13 +29,15 @@ fn main() -> Result<(), io::Error>{
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let global_data: AppData = serialize::deserialize::<AppData>("assets/data.json").unwrap();
+    let mut global_data: AppData = serialize::deserialize::<AppData>("assets/data.json").unwrap();
 
     let songs = match global_data.serialized_songs {
         true => serialize::deserialize(&global_data.serialize_path).unwrap(),
         false => {
             let songs = osu::load_songs(&global_data.song_path);
             serialize::serialize(&songs, &global_data.serialize_path);
+            global_data.serialized_songs = true;
+            serialize::serialize(&global_data, "assets/data.json");
             songs
         }
     };
