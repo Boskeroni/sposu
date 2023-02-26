@@ -1,6 +1,6 @@
 {
     "song_path": "D:/Apps/osu!/Songs/",
-    "serialized_songs": true,
+    "serialized_songs": false,
     "serialize_path": "assets/songs.json",
     "playlist_path": "assets/playlists.json"
 }

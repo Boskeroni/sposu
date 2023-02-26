@@ -2,7 +2,7 @@ use std::fs;
 use serde::{Serialize, Deserialize};
 
 pub fn serialize<T: Serialize>(data: &Vec<T>, path: &str) {
-    let serialized_data = serde_json::to_string(data).unwrap();
+    let serialized_data = serde_json::to_string_pretty(data).unwrap();
     fs::write(path, serialized_data).unwrap();
 }
 
