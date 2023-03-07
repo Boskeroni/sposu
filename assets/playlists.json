@@ -1,0 +1,56 @@
+[
+  {
+    "name": "good songs",
+    "songs": [
+      {
+        "audio_path": "594170 Avenged Sevenfold - Save Me/audio.mp3",
+        "song_name": "Save Me",
+        "artist": "Avenged Sevenfold",
+        "modifier": "Nightcore",
+        "length": 656
+      },
+      {
+        "audio_path": "407175 FELT - New World/New World.mp3",
+        "song_name": "New World",
+        "artist": "FELT",
+        "modifier": "Nightcore",
+        "length": 249
+      },
+      {
+        "audio_path": "185250 ALiCE'S EMOTiON - Dark Flight Dreamer/01 - Dark Flight Dreamer.mp3",
+        "song_name": "Dark Flight Dreamer",
+        "artist": "ALiCE'S EMOTiON",
+        "modifier": "Nightcore",
+        "length": 193
+      },
+      {
+        "audio_path": "525461 WALKURE - Ikenai Borderline (Speed Up Ver) (1)/audio.mp3",
+        "song_name": "Ikenai Borderline (Speed Up Ver.)",
+        "artist": "WALKURE",
+        "modifier": "NoMod",
+        "length": 231
+      },
+      {
+        "audio_path": "1022717 DJ Sharpnel - Back to the gate/audio.mp3",
+        "song_name": "Back to the gate",
+        "artist": "DJ Sharpnel",
+        "modifier": "NoMod",
+        "length": 323
+      },
+      {
+        "audio_path": "461744 Imperial Circus Dead Decadence - Yomi yori Kikoyu, Koukoku no Tou to Honoo no Shoujo/yomi.mp3",
+        "song_name": "Yomi yori Kikoyu, Koukoku no Tou to Honoo no Shoujo.",
+        "artist": "Imperial Circus Dead Decadence",
+        "modifier": "NoMod",
+        "length": 501
+      },
+      {
+        "audio_path": "580821 Krewella - Say Goodbye (Speed Up Ver)/audio.mp3",
+        "song_name": "Say Goodbye (Speed Up Ver.)",
+        "artist": "Krewella",
+        "modifier": "NoMod",
+        "length": 210
+      }
+    ]
+  }
+]

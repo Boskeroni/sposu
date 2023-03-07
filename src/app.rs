@@ -19,27 +19,27 @@ pub struct AppData {
     pub playlist_path: String,
 }
 
-pub struct App {
+pub struct App<'a, 'b> {
     pub current_ui: UIMode,
     pub query: String,
-    pub queried_songs: Vec<Song>,
-    pub playlists: Vec<Playlist>,
+    pub queried_songs: Vec<&'a Song>,
+    pub playlists: Vec<Playlist<'b>>,
     pub playlist_i: usize,
     pub query_i: usize,
     pub new_playlist_name: String,
     pub is_adding_list: bool,
     pub glob_data: AppData,
-    pub player: Player,
+    pub player: Player<'a>,
     all_songs: Vec<Song>,
 }
 
-impl App {
-    pub fn new(songs: Vec<Song>, glob_data: AppData, playlists: Vec<Playlist>) -> Self {
+impl<'a, 'b> App<'a, 'b> {
+    pub fn new(songs: Vec<Song>, glob_data: AppData, playlists: Vec<Playlist<'b>>) -> Self {
         let player = Player::new(glob_data.song_path.clone());
         Self {
             query: String::new(),
-            all_songs: songs.clone(),
-            queried_songs: songs,
+            all_songs: songs,
+            queried_songs: Vec::new(),
             query_i: 0,
             current_ui: UIMode::PlayBar,
             playlists,
@@ -85,10 +85,11 @@ impl App {
 
     /// GETS ALL THE MATCHING SONGS FROM SEARCH QUERY
     pub fn get_matching_songs(&mut self) {
-        self.queried_songs = vec![];
-        for song in self.all_songs.clone() {
-            if song.song_name.to_lowercase().contains(&self.query.to_lowercase()) {
-                self.queried_songs.push(song);
+        self.queried_songs = Vec::new();
+        for song in &self.all_songs {
+            let new_name = song.song_name.to_lowercase();
+            if new_name.contains(&self.query.to_lowercase()) {
+                self.queried_songs.push(&song);
             }
         }
     }
@@ -112,10 +113,10 @@ impl App {
                 if self.queried_songs.len() == 0 {
                     return;
                 }
-                let new_song = self.queried_songs[self.query_i].clone();
-                self.playlists[self.playlist_i].songs.push(new_song);
+                let new_song = self.queried_songs[self.query_i];
+                self.playlists[self.playlist_i].songs.push(&new_song);
                 if self.player.current_playlist.is_some() {
-                    self.player.current_playlist = Some(self.playlists[self.playlist_i].clone());
+                    self.player.current_playlist = Some(&self.playlists[self.playlist_i]);
                 }
             }
             // changes the mod of the song
@@ -136,7 +137,7 @@ impl App {
                     return;
                 }
                 let new_song = self.queried_songs[self.query_i].clone();
-                self.player.add_normal_song(new_song);
+                self.player.add_normal_song(&new_song);
             }
             // adds char to search query
             KeyCode::Char(e) => {
@@ -231,7 +232,7 @@ impl App {
             // unloads the playlsit
             KeyCode::Left => {
                 if self.player.current_playlist.is_some() {
-                    self.playlists[self.playlist_i] = self.player.pop_current_playlist();
+                    self.playlists[self.playlist_i] = *self.player.pop_current_playlist();
                 }
             }
             // removes char from new playlist
@@ -272,7 +273,7 @@ impl App {
                 }
                 // loads song to player
                 if !self.is_adding_list && self.playlists.len() != 0{
-                    self.player.load_playlist(self.playlists[self.playlist_i].clone());
+                    self.player.load_playlist(&self.playlists[self.playlist_i]);
                 }
                 // cant make a new list without a name
                 if self.new_playlist_name.len() == 0 {

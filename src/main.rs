@@ -1,5 +1,4 @@
 use std::io;
-use std::thread;
 use std::time::Duration;
 use crossterm::execute;
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
@@ -18,6 +17,20 @@ use app::*;
 use osu::Song;
 use player::deserialize_playlist;
 
+fn load_songs(data: &mut AppData) -> Vec<Song> {
+    if data.serialized_songs {
+        let pot_data = serialize::deserialize(&data.serialize_path);
+        if pot_data.is_ok() {
+            return pot_data.unwrap();
+        }
+    }
+    let songs = osu::load_all_songs(&data.song_path);
+    serialize::serialize(&songs, &data.serialize_path);
+    data.serialized_songs = true;
+    serialize::serialize(data, "assets/data.json");
+    songs
+}
+
 /// INITIALISES APP
 fn main() -> Result<(), io::Error>{
     enable_raw_mode()?;
@@ -31,7 +44,7 @@ fn main() -> Result<(), io::Error>{
     let mut terminal = Terminal::new(backend)?;
 
     let mut global_data: AppData = serialize::deserialize::<AppData>("assets/data.json").unwrap();
-    let songs = get_songs(&mut global_data);
+    let songs = load_songs(&mut global_data);
     let playlists = deserialize_playlist(&global_data.playlist_path.clone()).unwrap();
 
     let app = App::new(songs, global_data, playlists);
@@ -50,32 +63,16 @@ fn main() -> Result<(), io::Error>{
 /// RUNS THE APP
 fn main_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
+        terminal.draw(|f| renderer::render(f, &app))?;
         if app.player.sink.empty() {
             app.player.try_new_song()
         }
-        if crossterm::event::poll(Duration::from_millis(20))? {
-            if let Event::Key(key) = event::read()? {
-                if let Err(_) = app.event_handler(&key) {
-                    return Ok(())
-                }
-            }
+        if !crossterm::event::poll(Duration::from_millis(20))? {
+            continue;
         }
-        terminal.draw(|f| renderer::render(f, &app))?;
-        thread::sleep(Duration::from_nanos(1));
+        if let Event::Key(key) = event::read()? {
+            app.event_handler(&key).unwrap();
+        }
     }
 }
 
-fn get_songs(data: &mut AppData) -> Vec<Song> {
-    if data.serialized_songs {
-        let pot_data = serialize::deserialize(&data.serialize_path);
-        if pot_data.is_ok() {
-            return pot_data.unwrap();
-        }
-    }
-    let songs = osu::load_all_songs(&data.song_path);
-    println!("!");
-    serialize::serialize(&songs, &data.serialize_path);
-    data.serialized_songs = true;
-    serialize::serialize(data, "assets/data.json");
-    songs
-}

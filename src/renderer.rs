@@ -7,6 +7,7 @@ use tui::text::{Span, Text, Spans};
 use unicode_width::UnicodeWidthStr;
 
 use crate::osu::Mod;
+use crate::player::Playlist;
 use crate::{App, UIMode};
 
 /// THE GLOBAL RENDERER THAT CALLS EVERYTHING ELSE
@@ -228,16 +229,14 @@ fn basic_playlist<B: Backend>(app: &App, f: &mut Frame<B>, area: Rect) {
     };
 
     let list = match app.player.current_playlist.is_none() {
-        true => get_outer_playlist(app, style),
-        false => get_inner_playlist(app, style)
+        true => get_outer_playlist(&app.playlists, style),
+        false => get_inner_playlist(app.player.current_playlist.unwrap(), style)
     };
     f.render_widget(list, area)
 }
 
 /// RETURNS LIST OF SONGS INSIDE PLAYLIST
-fn get_inner_playlist(app: &App, style: Style) -> List {
-    let playlist = app.player.current_playlist.clone().unwrap();
-
+fn get_inner_playlist<'a>(playlist: &Playlist, style: Style) -> List<'a> {
     let title = format!("name: {} |shuffle: {} |repeat: {} |", playlist.name, playlist.shuffle_on, playlist.repeat_on);
     let list_items: Vec<ListItem> = playlist.songs.iter().map(|s| {
         ListItem::new(Text::from(Spans::from(Span::raw(s.song_name.clone()))))
@@ -254,10 +253,10 @@ fn get_inner_playlist(app: &App, style: Style) -> List {
 }
 
 /// RETURNS LIST OF PLAYLIST
-fn get_outer_playlist(app: &App, style: Style) -> List {
+fn get_outer_playlist<'a>(playlists: &Vec<Playlist>, style: Style) -> List<'a> {
     let title = "playlists";
 
-    let list_items: Vec<ListItem> = app.playlists.iter().map(|p| {
+    let list_items: Vec<ListItem> = playlists.iter().map(|p| {
         ListItem::new(Text::from(Spans::from(Span::raw(p.name.clone()))))
     }).collect();
 

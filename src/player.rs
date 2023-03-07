@@ -15,13 +15,16 @@ pub enum PlaybarSource {
     Normal,
 }
 
-pub struct Player {
+pub struct Player<'a> {
+    // rodio
     pub sink: Sink,
     pub _stream: OutputStream,
     pub stream_handle: OutputStreamHandle,
+
+    // playbar
     pub playbar_source: PlaybarSource,
-    pub current_songs: Vec<Song>,
-    pub current_playlist: Option<Playlist>,
+    pub current_songs: Vec<&'a Song>,
+    pub current_playlist: Option<&'a Playlist<'a>>,
     pub hovered_index: usize,
     pub parent_path: String,
     pub playing_index: usize,
@@ -29,7 +32,7 @@ pub struct Player {
     pub is_playing: bool,
 }
 
-impl Player {
+impl Player<'_> {
     pub fn new(parent_path: String) -> Self {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::new_idle().0;
@@ -71,27 +74,29 @@ impl Player {
     }
 
     // removes the playlist from the whole struct
-    pub fn pop_current_playlist(&mut self) -> Playlist {
+    pub fn pop_current_playlist(&mut self) -> &Playlist {
         self.playbar_source = PlaybarSource::None;
-        let temp = self.current_playlist.clone().unwrap();
+        let temp = self.current_playlist.unwrap();
         self.current_playlist = None;
-        temp
+        &temp
     }
 
     // loads the playlist
-    pub fn load_playlist(&mut self, playlist: Playlist) {
+    pub fn load_playlist(&mut self, playlist: &Playlist) {
         self.current_playlist = Some(playlist);
     }
 
     // loads playlist into paybar
     pub fn load_playbar_playlist(&mut self) {
-        if self.current_playlist.as_ref().unwrap().songs.is_empty() {
+        // don't do anything if the list is empty
+        if self.current_playlist.unwrap().songs.is_empty() {
             return;
         }
+
         self.current_songs = Vec::new();
         self.sink.stop();
-        self.current_playlist.as_mut().unwrap().prepare_playlist();
-        self.current_songs.append(&mut self.current_playlist.clone().unwrap().songs.clone());
+        self.current_playlist.unwrap().prepare_playlist();
+        self.current_songs.append(&mut self.current_playlist.unwrap().songs);
         self.playbar_source = PlaybarSource::Playlist;
         self.playing_index = 0;
     }
@@ -104,7 +109,7 @@ impl Player {
     }
 
     // adds regular song
-    pub fn add_normal_song(&mut self, song: Song) {
+    pub fn add_normal_song(&mut self, song: &Song) {
         self.current_songs.push(song);
         self.playbar_source = PlaybarSource::Normal;
     }
@@ -148,7 +153,7 @@ impl Player {
                     self.playing_index -= 1;
                 }
 
-                self.current_songs[self.playing_index].clone()
+                self.current_songs[self.playing_index]
             }
             _ => return,
         };
@@ -181,17 +186,17 @@ pub struct SerializedPlaylist {
 }
 
 #[derive(Clone, Debug)]
-pub struct Playlist {
+pub struct Playlist<'a> {
     pub name: String,
-    pub songs: Vec<Song>,
+    pub songs: Vec<&'a Song>,
     pub shuffle_on: bool,
     pub repeat_on: bool,
     song_index: usize,
-    song_choice: Vec<Song>,
+    song_choice: Vec<&'a Song>,
     removed_played: bool,
 }
 
-impl Playlist {
+impl Playlist<'_> {
     pub fn new_empty(name: String) -> Self {
         Self {
             name,
@@ -207,7 +212,7 @@ impl Playlist {
     pub fn new_loaded(serialized: &SerializedPlaylist) -> Self {
         Self {
             name: serialized.name.clone(),
-            songs: serialized.songs.clone(),
+            songs: serialized.songs.iter().collect(),
             shuffle_on: false,
             repeat_on: false,
             song_index: 0,
@@ -217,7 +222,7 @@ impl Playlist {
     }
 
     pub fn prepare_playlist(&mut self) {
-        self.song_choice = self.songs.clone();
+        self.song_choice = self.songs;
     }
 
     pub fn remove_playbar_song(&mut self, index: usize) {
@@ -227,25 +232,24 @@ impl Playlist {
         }
     }
 
-    pub fn get_next_song(&mut self) -> Option<(Song, usize)> {
+    pub fn get_next_song(&mut self) -> Option<(&Song, usize)> {
         if self.shuffle_on {
             let song_index = rand::thread_rng().gen_range(0..self.song_choice.len()-1);
-            let new_song = self.song_choice[song_index].clone();
+            let new_song = self.song_choice[song_index];
             return Some((new_song, song_index));
         }
         if self.removed_played {
             self.removed_played = false;
-            println!("{:?}", self.song_choice);
-            return Some((self.song_choice[self.song_index].clone(), self.song_index));
+            return Some((self.song_choice[self.song_index], self.song_index));
         }
         self.song_index += 1;
         if self.song_index < self.song_choice.len() {
-            return Some((self.song_choice[self.song_index-1].clone(), self.song_index-1));
+            return Some((self.song_choice[self.song_index-1], self.song_index-1));
         }
 
         self.song_index = 0;
         if self.repeat_on {
-            return Some((self.song_choice[self.song_index].clone(), self.song_index));
+            return Some((self.song_choice[self.song_index], self.song_index));
         }
         return None;
     }
@@ -263,8 +267,8 @@ impl Playlist {
 pub fn serialize_playlists(playlists: &Vec<Playlist>, path: &str) {
     let raw_data: Vec<SerializedPlaylist> = playlists.iter().map(|p| {
         SerializedPlaylist {
-            name: p.name.clone(),
-            songs: p.songs.clone()
+            name: p.name,
+            songs: p.songs.iter().map(|s| **s).collect()
         }
     }).collect();
 
